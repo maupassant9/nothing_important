@@ -1,0 +1,483 @@
+/*
+ * spi.c
+ *
+ *  Created on: 22 de dec de 2017
+ *  Author: dong.x
+ *  Version: 0.1
+ *
+ *  Description: Source file for SPI module, offers spi master
+ * initialization, spi direct read/write, spi dma read/write.
+ * SPI slave mode is not supported because there is no other spi
+ * master device on the board. 3 pin master mode or 4 pin master
+ * mode can be configured. Only 16bits transfer is supported.
+ *
+ * 	Change Records:
+ *      >> (22/Dec/2017): File Created.
+ *                        Create function: DrvSpiInit
+ *      >> (26/Dec/2017): DrvSpiRead, DrvSpiReadDma,
+ *                        DrvSpiWrite, DrvSpiWriteDma
+ */
+
+/*=========================================
+ * Includes
+ *=========================================*/
+#include "../BSP/type.h"
+#include "../BSP/conf.h"
+#include "../BSP/connector.h"
+#include <stdlib.h>
+
+#include "hw_types.h"
+#include "include/hw/soc_OMAPL138.h"
+#include "hw_syscfg0_OMAPL138.h"
+#include "include/armv5/omapl138/interrupt.h"
+#include "spi.h"
+#include "include/spi.h"
+#include "include/psc.h"
+#include "include/edma.h"
+
+/*=========================================
+ * Internal Variables
+ *=========================================*/
+//Internal data strucutre.
+typedef struct spi_internal_paras{
+    //Pin mux register addr high
+    uint32_t pin_mux_register_h;
+    //pin mux register addr low
+    uint32_t pin_mux_register_l;
+    //register base address.
+    uint32_t base_addr;
+    //cs configuration
+    uint8_t cs_cfg;
+    //spi clk freq
+    uint32_t clk_freq;
+    //input frequency
+    uint32_t in_freq;
+    //SPI data format register
+    uint32_t fmt;
+    //Pin Control register 0-1 value
+    uint32_t pc0;
+    uint32_t pc1;
+    //cs hold value
+    bool_t is_cs_hold;
+
+} spi_internal_t;
+
+/*=========================================
+ * Internal function declaration
+ *=========================================*/
+// Initialize the gpio mutex regsiter and power on spi
+static void SpiPowerGPIOInit(spi_handle_t * handle);
+// spi internal data struture init
+static void SpiInternalStrInit(spi_handle_t * ptr_spi_handle,
+                                spi_conf_t * ptr_conf);
+
+
+/*=========================================
+ * Functions
+ *=========================================*/
+/*============================================================
+ * Function: DrvSpiInit()
+ * Description: Initilization of SPI module according to the
+ * configuration structure.
+ * Para:
+ *    >> spi_handle_t * handle: a spi handle
+ *    >> spi_conf_t * ptr: spi configuration structure
+ * Return:
+ *     >> uint8_t: -1: error occured;
+ *                     any value > 0 success.
+ * Change Record:
+ *		>> (22/Dec/2017): Creation of the function;
+ *      >> (26/Dec/2017): Realization.
+ *      >> (04/Jan/2018): Tested OK.
+ *
+ *============================================================*/
+void DrvSpiInit(spi_handle_t * handle, spi_conf_t * ptr_conf)
+{
+    spi_internal_t * ptr_internal;
+    //Initialize the internal structure
+    SpiInternalStrInit(handle, ptr_conf);
+    ptr_internal = (spi_internal_t *)handle->ptr_spi_data;
+
+    //Power on SPI and SPI CLK SIMO SOMI pin mutex configure
+    SpiPowerGPIOInit(handle);
+    //Reset SPI and take it out of reset.
+    SPIReset(ptr_internal->base_addr);
+    SPIOutOfReset(ptr_internal->base_addr);
+    //Set SPI as master
+    SPIModeConfigure(ptr_internal->base_addr, SPI_MASTER_MODE);
+    //CLK configuration
+    SPIClkConfigure(ptr_internal->base_addr, ptr_internal->in_freq,
+                ptr_internal->clk_freq, SPI_DATA_FORMAT0);
+
+    //Set Spi pin control registers.
+    SPIPinControl(ptr_internal->base_addr, 0, 0, &(ptr_internal->pc0));
+    SPIPinControl(ptr_internal->base_addr, 1, 0, &(ptr_internal->pc1));
+    //Configure default cs set.
+    SPIDefaultCSSet(ptr_internal->base_addr, ptr_internal->cs_cfg);
+
+    // Configures SPI Data Format Register
+    SPIConfigClkFormat(ptr_internal->base_addr,
+                       ptr_internal->fmt & (BIT(16)|BIT(17)),
+                       SPI_DATA_FORMAT0);
+
+    // Configures SPI to transmit MSB bit First during data transfer
+    if(!(ptr_internal->fmt & BIT(20))){
+        SPIShiftMsbFirst(ptr_internal->base_addr, SPI_DATA_FORMAT0);
+    }
+
+    // Sets the Charcter length
+    SPICharLengthSet(ptr_internal->base_addr, ptr_internal->fmt &(0x1f), SPI_DATA_FORMAT0);
+
+     // Selects the SPI Data format register to used
+    SPIDat1Config(ptr_internal->base_addr, SPI_DATA_FORMAT0, ptr_internal->cs_cfg);
+
+     // map interrupts to interrupt line INT1 TODO:
+    SPIIntLevelSet(ptr_internal->base_addr, SPI_RECV_INTLVL | SPI_TRANSMIT_INTLVL);
+
+    // Enable SPI communication
+    SPIEnable(ptr_internal->base_addr);
+
+    //SPIIntEnable(ptr_internal->base_addr, SPI_DMA_REQUEST_ENA_INT);
+
+    PSCModuleControl(SOC_PSC_0_REGS, HW_PSC_CC0, PSC_POWERDOMAIN_ALWAYS_ON, PSC_MDCTL_NEXT_ENABLE);
+
+        /* Enabling the PSC for EDMA3TC_0.*/
+    PSCModuleControl(SOC_PSC_0_REGS, HW_PSC_TC0, PSC_POWERDOMAIN_ALWAYS_ON, PSC_MDCTL_NEXT_ENABLE);
+
+}
+
+
+/*============================================================
+ * Function: DrvWrite()
+ * Description: Write to specific slave, this function only write
+ * to TX part of SPIDAT1 register.
+ * Para:
+ *    >> spi_conf_t * ptr: spi configuration structure
+ * Return:
+ *     >>
+ * Change Record:
+ *		>> (28/Dec/2017): Creation and realization;
+ *		>> (04/Jan/2018): Tested OK.
+ *
+ *============================================================*/
+void DrvSpiWrite(spi_handle_t * handle, uint32_t data)
+{
+	while(HWREG(SOC_SPI_0_REGS+0x10) & 0x0200 == 0);
+    SPITransmitData1 (((spi_internal_t *)handle->ptr_spi_data)
+                        ->base_addr,  data);
+}
+
+/*============================================================
+ * Function: DrvSpiSetCs()
+ * Description: Write to specific slave, this function only write
+ * to TX part of SPIDAT1 register.
+ * Para:
+ *    >> spi_conf_t * ptr: spi configuration structure
+ *    >> uint8_t: the corresponding cs pin that need to use next time
+ *                cs = 0, cs_0; cs = 1, cs_1; cs = 2, cs_2;
+ *                cs = 3, cs_3, ....
+ * Return:
+ *     >>
+ * Change Record:
+ *		>> (04/Jan/2018): Creation and realization;
+ *		>> Tested.
+ *
+ *============================================================*/
+void DrvSpiSetCs(spi_handle_t * handle, uint8_t cs)
+{
+	spi_internal_t * ptr_internal = (spi_internal_t *)handle->ptr_spi_data;
+
+    cs = 0x01 << cs;
+	SPIDat1Config(ptr_internal->base_addr, SPI_DATA_FORMAT0, (ptr_internal->cs_cfg)&cs);
+}
+
+/*============================================================
+ * Function: DrvSpiCsHold()
+ * Description: CS hold Configuration.
+ * Para:
+ *    >> spi_conf_t * ptr: spi configuration structure
+ *    >> bool_t: set (1) or clear CS hold bit.
+ * Return:
+ *     >>
+ * Change Record:
+ *		>> (08/Jan/2018): Creation and realization;
+ *
+ *============================================================*/
+void DrvSpiCsHold(spi_handle_t * handle, bool_t is_cs_hold)
+{
+	spi_internal_t *ptr_internal;
+	ptr_internal = (spi_internal_t *)handle->ptr_spi_data;
+	// Selects the SPI Data format register to used
+	if(is_cs_hold){
+		SPIDat1Config(ptr_internal->base_addr,
+				SPI_DATA_FORMAT0|SPI_CSHOLD,
+				ptr_internal->cs_cfg);
+	}
+	else{
+		SPIDat1Config(ptr_internal->base_addr,
+				SPI_DATA_FORMAT0,
+				ptr_internal->cs_cfg);
+	}
+}
+
+
+
+/*============================================================
+ * Function: DrvSpiWriteDma()
+ * Description: Write to specific slave using DMA (not QDMA)
+ * DMA CH15(SPI0)/19(SPI1) and queue 0 is used here.
+ * (1) Properly Configure the DMA channel 0:
+ *      acnt, bcnt, ccnt;
+ *      src_addr;
+ *      dst_addr;
+ *      trigger event: write enable interrupt;
+ *      etc..
+ * (2) SPI set CS and CS_HOLD.
+ * (3) The DMA should run automatically....
+ * (4) Wait for DMA to complete the task.
+ * Para:
+ *    >> spi_conf_t * ptr: spi configuration structure
+ *    >> uint8_t: define which cs should be used.
+ * Return:
+ *     >> uint8_t: -1: error occured;
+ *                     any value > 0 success.
+ * Change Record:
+ *		>> (27/Dec/2017): Creation;
+ *      >> (15/Jan/2018): realization
+ *
+ *============================================================*/
+uint8_t DrvSpiWriteDma(spi_handle_t * handle)
+{
+	//nothing here
+	//TODO: Should be deleted, and spi_handle should be
+	//changed.
+	return 0;
+}
+
+/*============================================================
+ * Function: DrvSpiRead()
+ * Description: Block Read from specific slave.
+ * Para:
+ *    >> spi_conf_t * ptr: spi configuration structure
+ * Return:
+ *     >> uint8_t: -1: error occured;
+ *                     any value > 0 success.
+ * Change Record:
+ *		>> (27/Dec/2017): Creation and realization;
+ *      >> (04/Jan/2018): Test ok.
+ *
+ *============================================================*/
+uint32_t DrvSpiRead(spi_handle_t * handle)
+{
+    spi_internal_t * ptr_internal = (spi_internal_t *)handle->ptr_spi_data;
+    //wait until has data
+    while(!(HWREG(SOC_SPI_0_REGS+0x10) & 0x0100));
+    return SPIDataReceive(ptr_internal->base_addr);
+}
+
+
+/*============================================================
+ * Function: DrvReadDma()
+ * Description: Read from specific slave using DMA
+ * DMA CH14 and queue 1 is used here.
+ * (1) Properly Configure the DMA channel 0:
+ *      acnt, bcnt, ccnt;
+ *      src_addr;
+ *      dst_addr;
+ *      trigger event: read rdy interrupt;
+ *      etc..
+ * (2) and write the first data to the SPI_DAT1
+ * (3) The DMA should run automatically....
+ * (4) Wait for DMA to complete the task.
+ * Para:
+ *    >> spi_conf_t * ptr: spi configuration structure
+ * Return:
+ *     >> uint8_t: -1: error occured;
+ *                     any value > 0 success.
+ * Change Record:
+ *		>> (26/Dec/2017): Creation and realization;
+ *
+ *============================================================*/
+uint8_t DrvSpiReadDma(spi_handle_t * handle)
+{
+    //copy the buffer addr to current_buffer_addr
+    //set DMA here. No DMA source is setted.
+    return 0;
+    //TODO:Should be deleted, will not be used.
+}
+
+/*============================================================
+ * Function: DrvAttachBuffer()
+ * Description: Read from specific slave using DMA
+ * Para:
+ *    >> spi_handle_t * ptr: spi handle
+ *    >> bool_t: true for write buffer, false for read buffer
+ *    >> void *: a pointer to a buffer
+ *    >> uint32_t: the size of buffer (in bytes)
+ * Return:
+ *     >>
+ * Change Record:
+ *		>> (26/Dec/2017): Creation and realization;
+ *
+ *============================================================*/
+void DrvSpiAttachBuffer(spi_handle_t * handle, bool_t is_write,
+                        void * ptr_buffer,uint32_t buffer_sz)
+{
+	if(is_write) {
+        handle->ptr_buffer_wt = (uint8_t *)ptr_buffer;
+        handle->buffer_wt_sz = buffer_sz;
+    }else {
+        handle->ptr_buffer_rd = (uint8_t *)ptr_buffer;
+        handle->buffer_rd_sz = buffer_sz;
+    }
+}
+
+/*============================================================
+ * Function: SpiPowerGPIOInit()
+ * Description: Power on SPI module and Initializ the GPIO mutex
+ * Para:
+ *    >> spi_conf_t * ptr: spi configuration structure
+ * Return:
+ *     >> uint8_t: -1: error occured;
+ *                     any value > 0 success.
+ * Change Record:
+ *		>> (26/Dec/2017): Creation and realization;
+ *      >> (04/Jan/2017): Test Ok.
+ *
+ *============================================================*/
+static void SpiPowerGPIOInit(spi_handle_t * handle)
+{
+    spi_internal_t * ptr_internal;
+    uint32_t save_pin_mutex = 0;
+    //Power on SPI and SPI CLK SIMO SOMI pin mutex configure
+    ptr_internal = (spi_internal_t *) handle->ptr_spi_data;
+
+    switch(ptr_internal->base_addr)
+    {
+        case SOC_SPI_0_REGS: PSCModuleControl(SOC_PSC_0_REGS,HW_PSC_SPI0,
+            PSC_POWERDOMAIN_ALWAYS_ON,PSC_MDCTL_NEXT_ENABLE);
+            save_pin_mutex = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(3)) &
+					  ~(0x0000ff0f));
+	        HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(3)) =
+			 (0x00001101|save_pin_mutex);
+            break;
+        case SOC_SPI_1_REGS: PSCModuleControl(SOC_PSC_1_REGS,HW_PSC_SPI1,
+            PSC_POWERDOMAIN_ALWAYS_ON,PSC_MDCTL_NEXT_ENABLE);
+            save_pin_mutex = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(5)) &
+					  ~(0x00ff0f00));
+	        HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(5)) =
+			 (0x00110100|save_pin_mutex);
+             break;
+        default: break;
+    }
+
+    //GPIO mutex conf
+    if(ptr_internal->cs_cfg & 0x01) //CS_0 set
+    {
+        save_pin_mutex =  HWREG(ptr_internal->pin_mux_register_h) &
+					~(0x000000f0);
+	    HWREG(ptr_internal->pin_mux_register_h) =
+			        (0x00000010|save_pin_mutex);
+    }
+    if(ptr_internal->cs_cfg & 0x02) //CS_1 set
+    {
+        save_pin_mutex =  HWREG(ptr_internal->pin_mux_register_h) &
+					~(0x0000000f);
+	    HWREG(ptr_internal->pin_mux_register_h) =
+			        (0x00000001|save_pin_mutex);
+    }
+    if(ptr_internal->cs_cfg & 0x04) //CS_2 set
+    {
+        save_pin_mutex =  HWREG(ptr_internal->pin_mux_register_l) &
+					~(0xf0000000);
+	    HWREG(ptr_internal->pin_mux_register_l) =
+			        (0x10000000|save_pin_mutex);
+    }
+    if(ptr_internal->cs_cfg & 0x08) //CS_3 set
+    {
+        save_pin_mutex =  HWREG(ptr_internal->pin_mux_register_l) &
+					~(0x0f000000);
+	    HWREG(ptr_internal->pin_mux_register_l) =
+			        (0x01000000|save_pin_mutex);
+    }
+    if(ptr_internal->cs_cfg & 0x10) //CS_4 set
+    {
+        save_pin_mutex =  HWREG(ptr_internal->pin_mux_register_l) &
+					~(0x00f00000);
+	    HWREG(ptr_internal->pin_mux_register_l) =
+			        (0x00100000|save_pin_mutex);
+    }
+    if(ptr_internal->cs_cfg & 0x20) //CS_5 set
+    {
+        save_pin_mutex =  HWREG(ptr_internal->pin_mux_register_l) &
+					~(0x000f0000);
+	    HWREG(ptr_internal->pin_mux_register_l) =
+			        (0x00010000|save_pin_mutex);
+    }
+}
+
+
+/*============================================================
+ * Function: SpiInternalStrInit()
+ * Description: Power on SPI module and Initializ the GPIO mutex
+ * Para:
+ *    >> spi_conf_t * ptr: spi configuration structure
+ * Return:
+ *     >>
+ * Change Record:
+ *		>> (26/Dec/2017): Creation and realization;
+ *      >> (02/Jan/2018): Tested ok.
+ *
+ *============================================================*/
+static void SpiInternalStrInit(spi_handle_t * handle, spi_conf_t * ptr_conf)
+{
+    //create the spi internal data structure
+    handle->ptr_spi_data = malloc(sizeof(spi_internal_t));
+    spi_internal_t * ptr_internal = (spi_internal_t *) handle->ptr_spi_data;
+
+    //Initializ the internal data
+    ptr_internal->pc0 = 0;
+    ptr_internal->pc1 = 0;
+
+    handle->dev_id = ptr_conf->id;
+
+    //get the reg address.
+    if(ptr_conf->id == 0){
+        ptr_internal->pin_mux_register_h = SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(4);
+        ptr_internal->pin_mux_register_l = SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(3);
+        ptr_internal->base_addr = SOC_SPI_0_REGS;
+        handle->base_addr = SOC_SPI_0_REGS;
+        ptr_internal->in_freq = SPI_0_FREQ;
+    }
+    else if(ptr_conf->id == 1){
+        ptr_internal->pin_mux_register_h = SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(5);
+        ptr_internal->pin_mux_register_l = SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(4);
+        ptr_internal->base_addr = SOC_SPI_1_REGS;
+        handle->base_addr = SOC_SPI_1_REGS;
+        ptr_internal->in_freq = SPI_1_FREQ;
+    }
+    ptr_internal->cs_cfg = ptr_conf->cs_pins;
+    ptr_internal->clk_freq = ptr_conf->clk_freq;
+    ptr_internal->fmt = ptr_conf->data_length;
+    //set the fmt content
+    if(ptr_conf->clk_polarity_phase & 0x01){
+        ptr_internal->fmt |= BIT(16);
+    }
+    if(ptr_conf->clk_polarity_phase & 0x02){
+        ptr_internal->fmt |= BIT(17);
+    }
+    if(ptr_conf->shift_lsb_first){
+        ptr_internal->fmt |= BIT(20);
+    }
+
+    ptr_internal->pc0 |= (BIT(11) + BIT(10) + BIT(9));
+    ptr_internal->pc0 |= ptr_internal->cs_cfg;
+
+    ptr_internal->pc1 |= (BIT(10) + BIT(9));
+    ptr_internal->pc1 |= ptr_internal->cs_cfg;
+
+    ptr_internal->is_cs_hold = false;
+}
+
+
+

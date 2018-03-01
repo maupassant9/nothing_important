@@ -1,0 +1,240 @@
+/*
+ * connector.c
+ *
+ *  Created on: 14 de dec de 2017
+ *  Author: dong.x
+ *  Version: 0.1
+ *
+ *  Description: Connector function for all the drivers.
+ *
+ * 	Change Records:
+ *      >> (14/Dec/2017): file created;
+ *                        add function: connectUart, connectorInit.
+ *      >> (21/Dec/2017): change uart_handle to uartA_handle and
+ *                        add uartB_handle.
+ */
+
+/*=========================================
+ * Includes
+ *=========================================*/
+#include "type.h"
+#include "conf.h"
+#include "../BSP/Drivers/UART/uart.h"
+#include "../BSP/Drivers/COMMON/pwm/pwm.h"
+#include "../BSP/Drivers/COMMON/spi/spi.h"
+#include "../BSP/Drivers/tdc/tdc.h"
+#include "../BSP/Drivers/led/led.h"
+#include "connector.h"
+
+/*=========================================
+ * External variables
+ *=========================================*/
+uart_handle_t uartA_handle;
+uart_handle_t uartB_handle;
+pwm_handle_t pwm_handle;
+spi_handle_t spi0_handle;
+spi_handle_t spi1_handle;
+tdc_handle_t tdc0_handle;
+tdc_handle_t tdc1_handle;
+tdc_handle_t tdc2_handle;
+tdc_handle_t tdc3_handle;
+tdc_handle_t tdc4_handle;
+leds_handle_t leds_handle;
+i2c_handle_t i2c_handle;
+#ifndef OMAPL138_DSP /* ARM */
+watchdog_handle_t watchdog_handle;
+#else /* DSP */
+//should be keeped in shared memory
+
+#endif
+
+
+/*=========================================
+ * Internal function declaration
+ *=========================================*/
+static void ConnectUart(void);
+static void ConnectPwm(void);
+static void ConnectSpi(void);
+static void ConnectTdc(void);
+static void ConnectLeds(void);
+
+/*=========================================
+ * Functions
+ *=========================================*/
+
+/*============================================================
+ * Function: ConnectInit()
+ * Description: Connect the Usart Driver and the connctor
+ * This function should be changed when other driver is used.
+ * Para:
+ *      >>
+ * Return:
+ *      >>
+ * Change Record:
+ *		>> (14/Dec/2017): func created
+ *      >> (20/Dec/2017): func modified, add func call ConnectPWM
+ *
+ *============================================================*/
+void ConnectorInit(void)
+{
+    ConnectUart();
+    ConnectPwm();
+    ConnectSpi();
+    ConnectTdc();
+    ConnectLeds();
+    
+}
+
+
+/*============================================================
+ * Function: ConnectUart()
+ * Description: Connect the Uart Driver and the connctor
+ * This function should be changed when other driver is used.
+ * Para:
+ *      >>
+ * Return:
+ *      >>
+ * Change Record:
+ *		>> (14/Dec/2017): function created;
+ *      >> (16/Dec/2017): Complete function;
+ *      >> (20/Dec/2017): change to uartA_handle
+ *
+ *============================================================*/
+static void ConnectUart(void)
+{
+    //Connect Uart 1
+    uartA_handle.Init = DrvUartInit;
+    uartA_handle.ReadChar = DrvUartReadChar;
+    uartA_handle.ReadCharBlock = DrvUartReadCharBlock;
+    uartA_handle.WriteCharBlock = DrvUartWriteCharBlock;
+    uartA_handle.WriteChar = DrvUartWriteChar;
+    uartA_handle.HasChar = DrvUartHasChar;
+    uartA_handle.IsTxRdy = DrvUartIsTxRdy;
+    uartA_handle.Disable = DrvUartDisable;
+
+    //TODO: uart 2
+
+}
+
+
+/*============================================================
+ * Function: ConnectPwm()
+ * Description: Connect the Uart Driver and the connctor
+ * This function should be changed when other driver is used.
+ * Para:
+ *      >>
+ * Return:
+ *      >>
+ * Change Record:
+ *		>> (20/Dec/2017): Func created;
+ *
+ *============================================================*/
+static void ConnectPwm(void)
+{
+    pwm_handle.Init = DrvPwmInit;
+    pwm_handle.SetPulseWidth = DrvPwmSetPulseWidth;
+    pwm_handle.SetDelay = DrvPwmSetDelay;
+    pwm_handle.SetFreq = DrvPwmSetFreq;
+    pwm_handle.Start = DrvPwmStart;
+    pwm_handle.Stop = DrvPwmStop;
+}
+
+/*============================================================
+ * Function: ConnectSpi()
+ * Description: Connect the Spi Driver and the connctor
+ * This function should be changed when other driver is used.
+ * Para:
+ *      >>
+ * Return:
+ *      >>
+ * Change Record:
+ *		>> (21/Dec/2017): Func created;
+ *
+ *============================================================*/
+static void ConnectSpi(void)
+{
+    spi0_handle.Init = DrvSpiInit;
+    spi0_handle.Read = DrvSpiRead;
+    spi0_handle.Write = DrvSpiWrite;
+    spi0_handle.ReadDma = DrvSpiReadDma;
+    spi0_handle.WriteDma = DrvSpiWriteDma;
+    spi0_handle.AttachBuffer = DrvSpiAttachBuffer;
+    spi0_handle.SetCs = DrvSpiSetCs;
+    spi0_handle.CsHold = DrvSpiCsHold;
+
+    spi1_handle.Init = DrvSpiInit;
+    spi1_handle.Read = DrvSpiRead;
+    spi1_handle.Write = DrvSpiWrite;
+    spi1_handle.ReadDma = DrvSpiReadDma;
+    spi1_handle.WriteDma = DrvSpiWriteDma;
+    spi1_handle.AttachBuffer = DrvSpiAttachBuffer;
+    spi1_handle.SetCs = DrvSpiSetCs;
+    spi1_handle.CsHold = DrvSpiCsHold;
+}
+
+/*============================================================
+ * Function: ConnectTdc()
+ * Description: Connect the tdc Driver and the connctor
+ * This function should be changed when other driver is used.
+ * Para:
+ *      >>
+ * Return:
+ *      >>
+ * Change Record:
+ *		>> (21/Dec/2017): Func created;
+ *
+ *============================================================*/
+static void ConnectTdc(void){
+
+	//Connect tdc0
+	tdc0_handle.Init = DrvTdcInit;
+	tdc0_handle.Start = DrvTdcStart;
+	tdc0_handle.GetResult = DrvTdcGetResult;
+	tdc0_handle.Enable = DrvTdcEnable;
+	tdc0_handle.Disable = DrvTdcDisable;
+	tdc0_handle.EnterAutoMode = DrvTdcEnterAutoMode;
+
+	//Connect tdc1
+	tdc1_handle.Init = DrvTdcInit;
+	tdc1_handle.Start = DrvTdcStart;
+	tdc1_handle.GetResult = DrvTdcGetResult;
+	tdc1_handle.Enable = DrvTdcEnable;
+	tdc1_handle.Disable = DrvTdcDisable;
+	tdc1_handle.EnterAutoMode = DrvTdcEnterAutoMode;
+
+	//Connect tdc2
+	tdc2_handle.Init = DrvTdcInit;
+	tdc2_handle.Start = DrvTdcStart;
+	tdc2_handle.GetResult = DrvTdcGetResult;
+	tdc2_handle.Enable = DrvTdcEnable;
+	tdc2_handle.Disable = DrvTdcDisable;
+	tdc2_handle.EnterAutoMode = DrvTdcEnterAutoMode;
+
+	//Connect tdc3
+	tdc3_handle.Init = DrvTdcInit;
+	tdc3_handle.Start = DrvTdcStart;
+	tdc3_handle.GetResult = DrvTdcGetResult;
+	tdc3_handle.Enable = DrvTdcEnable;
+	tdc3_handle.Disable = DrvTdcDisable;
+	tdc3_handle.EnterAutoMode = DrvTdcEnterAutoMode;
+}
+
+
+/*============================================================
+ * Function: ConnectLeds()
+ * Description: Connect the Leds Driver and the connector
+ * This function should be changed when other driver is used.
+ * Para:
+ *      >>
+ * Return:
+ *      >>
+ * Change Record:
+ *		>> (30/Jan/2017): Func created;
+ *
+ *============================================================*/
+static void ConnectLeds(void){
+	leds_handle.Init = DrvLedsInit;
+	leds_handle.Set = DrvLedsSet;
+	leds_handle.Unset = DrvLedsUnset;
+	leds_handle.Update = DrvLedsUpdate;
+}

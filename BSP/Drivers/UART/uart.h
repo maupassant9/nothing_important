@@ -1,0 +1,133 @@
+/*
+ * bsp_board.h
+ *
+ *  Created on: 27 de nov de 2017
+ *  Author: dong.x
+ *  Change Records: 
+ *     >>(12/Dec/2017): add uart_conf, UartInit(); 
+ *     >>(13/Dec/2017): configuration struture added.
+ */
+
+#ifndef BSP_DRIVERS_UART_UART_H_
+#define BSP_DRIVERS_UART_UART_H_
+
+#include "../BSP/type.h"
+#include "../BSP/connector.h"
+
+/*============================================================
+ * Macro 
+ *============================================================*/
+
+/*============================================================
+ *Typedef
+ *============================================================*/
+
+
+/*============================================================
+ *Function Prototype
+ *============================================================*/
+
+/*===================================
+ * DrvUartInit()
+ * Para:
+ *    >> uart_conf_t * ptr: configuration structure for uart
+ * Return: 
+ *    >> void
+ * Usage: Initilization of Uart Module. 
+ * After calling this function, the 
+ * corresponding uart module will be 
+ * ready.
+ *===================================*/
+void DrvUartInit(uart_handle_t * handle, uart_conf_t *ptr_cfg);
+
+
+/*===================================
+ * DrvUartReadChar()
+ * Para:
+ *    >> uart_handle_t: uart handle 
+ * Return: 
+ *    >> int32_t: received character or command.
+ *                 -1 if error in reading.
+ * Usage: Read the uart with no blocking
+ *===================================*/
+int32_t DrvUartReadChar(uart_handle_t *);
+
+/*===================================
+ * DrvUartReadCharBlock()
+ * Para:
+ *    >> uart_handle_t: uart handle 
+ * Return: 
+ *    >> uint8_t: received character or command.
+ * Usage: Read the uart with block
+ *===================================*/
+uint8_t DrvUartReadCharBlock(uart_handle_t *);
+
+/*===================================
+ * DrvUartWriteChar()
+ * Para:
+ *    >> uart_handle_t: uart handle 
+ *    >> uint8_t: the value to be written.
+ * Return: 
+ *    >> bool_t: ture for sucess, false for fail
+ * Usage: Write a character to uart (no block)
+ *===================================*/
+bool_t DrvUartWriteChar(uart_handle_t *, uint8_t val);
+
+/*===================================
+ * DrvUartWriteCharBlock()
+ * Para:
+ *    >> uart_handle_t: uart handle 
+ *    >> uint8_t: the value to be written.
+ * Return: 
+ *    >> 
+ * Usage: Write a character to uart with block
+ *===================================*/
+void DrvUartWriteCharBlock(uart_handle_t *, uint8_t val);
+
+/*============================================================
+ * Function: DrvUartHasChar(uart_handle_t *)
+ * Paras:
+ *      >> uart_handle_t: uart handle 
+ * Return:
+ *      >> bool_t: true for has at least one byte for read
+ *                 false for has no data available.
+ * Usage: Chk if there is character to be read.
+ *============================================================*/
+bool_t DrvUartHasChar(uart_handle_t * handle);
+
+
+/*============================================================
+ * Function: DrvUartIsTxRdy(uart_handle_t *)
+ * Paras:
+ *      >> uart_handle_t: uart handle 
+ * Return:
+ *      >> bool_t: true for tx is avaliable
+ *                 false for tx not available.
+ * Usage: Chk if transfer is available.
+ *============================================================*/
+bool_t DrvUartIsTxRdy(uart_handle_t * handle);
+
+
+/*============================================================
+ * Function: DrvUartDisable(uart_handle_t *)
+ * Paras:
+ *      >> uart_handle_t: uart handle 
+ * Usage: Disable the uart and release the handle memory
+ *============================================================*/
+void DrvUartDisable(uart_handle_t * handle);
+
+/*============================================================
+ * Function: DrvUartWriteStr(uart_handle_t *, String str)
+ * Description: Uart Write Character with blocking
+ * use UartCharPut function.
+ * Paras:
+ *      >> uart_handle_t: uart handle 
+ *      >> uint8_t: value to be written
+ * Return:
+ *      >> 
+ * Change Record: 
+ *		>> (08/Fev/2018): Creation of the function
+ *============================================================*/
+void DrvUartWriteStr(uart_handle_t * handle, char * str);
+
+#endif /* BSP_DRIVERS_UART_UART_H_ */

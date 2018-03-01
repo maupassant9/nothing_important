@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<!--  This file conforms to the DTD xdc/bld/build.dtd -->
+<package name="xconfig_newcfg" version="" producerId="undefined">
+    <units>
+    </units>
+    <sources>
+        <srcFile name="package/cfg/newcfg_pe9.c"/>
+    </sources>
+    <configscripts>
+        <srcFile name="C:/Users/dong.x/workspace_v6_2/Test/newcfg.cfg"/>
+    </configscripts>
+    <makefiles>
+        <srcFile name="package.mak" src="package.bld"/>
+        <srcFile name="package/package.xdc.dep" src="package.xdc"/>
+        <srcFile name="package/cfg/newcfg_pe9.mak" src="package.bld"/>
+        <srcFile name="package/cfg/newcfg_pe9.oe9.dep" src="package/cfg/newcfg_pe9.c"/>
+        <srcFile name="package/cfg/newcfg_pe9.dep" src="package/cfg/newcfg_pe9.cfg"/>
+        <srcFile name="package/cfg/newcfg.xe9.mak" src="package.bld"/>
+        <srcFile name="package/rel/xconfig_newcfg.tar.dep" src="package/rel/xconfig_newcfg.xdc.inc"/>
+    </makefiles>
+    <targets>
+        <target name="ti.targets.arm.elf.Arm9"
+            version="ti.targets.arm.elf.Arm9{1,0,15.12,3"
+            rawVersion="15.12.3"
+            platform="ti.platforms.sim470xx"
+            isa="v5T"
+            suffix="e9"
+            rootDir="C:/ti/ccs620/ccsv6/tools/compiler/arm_15.12.3.LTS"
+            os="undefined"
+            rts="ti.targets.arm.rtsarm">
+            <model endian="little"
+                codeModel="undefined"
+                dataModel="undefined"/>
+        </target>
+    </targets>
+    <libraries>
+    </libraries>
+    <configurations>
+    <configuration name="newcfg"
+        pname="newcfg.pe9"
+        target="ti.targets.arm.elf.Arm9"
+        platform="ti.platforms.evmOMAPL138"
+        profile="release"
+        isPartial="false"
+        xCfgScript="package/cfg/newcfg_pe9.cfg"
+        xCfgPrefix="package/cfg/newcfg_pe9"
+        cfgScript="C:/Users/dong.x/workspace_v6_2/Test/newcfg.cfg"
+        cfgArgs="null"
+        />
+    </configurations>
+    <executables>
+    <executable name="newcfg"
+        pname="newcfg.xe9"
+        target="ti.targets.arm.elf.Arm9"
+        platform="ti.platforms.evmOMAPL138"
+        profile="release"
+        xCfgScript="package/cfg/newcfg_pe9.cfg"
+        xCfgPrefix="package/cfg/newcfg_pe9"
+        cfgScript="C:/Users/dong.x/workspace_v6_2/Test/newcfg.cfg"
+        cfgArgs="null"
+        />
+    </executables>
+    <tests>
+    <test exeName="newcfg.xe9"
+        args=""
+        groupName="newcfg.xe9"
+        refOutput="undefined"
+        refExitCode="0"
+        execArgs=""
+        />
+    </tests>
+    <releases relDir="package/rel/">
+    <release name="xconfig_newcfg"
+        pname="xconfig_newcfg.tar"
+        label="default"
+    >
+        <file name="package/package.bld.xml"/>
+        <file name="package/build.cfg"/>
+        <file name="package/package.xdc.inc"/>
+    </release>
+    </releases>
+    <repositories>
+    </repositories>
+</package>

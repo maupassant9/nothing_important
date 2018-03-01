@@ -1,0 +1,129 @@
+/*
+ * board.c
+ *
+ *  Created on: 27 de nov de 2017
+ *  Author: dong.x
+ *  Version: 0.1
+ *
+ *  Description: Source file for Board. Contains all the
+ *  necessary function for board access.
+ *
+ * 	Change Records:
+ *      >> (11/Dec/2017): Creation of function: GPIOAllInit();
+ *      >> Creation of function BoardInit();
+ *
+ */
+
+/*=========================================
+ * Includes
+ *=========================================*/
+#include "board.h"
+#include "connector.h"
+#include "conf.h"
+#include "type.h"
+#include "../BSP/Drivers/common/gpio/gpio.h"
+
+/*=========================================
+ * Functions
+ *=========================================*/
+/*============================================================
+ * Function: BoardInit()
+ * Description: Initilization of all of the components of the
+ * board.
+ * 1. Initialize GPIO module.
+ * Change Record:
+ *		>> (11/Dec/2017): Creation of the function
+ *============================================================*/
+void BoardInit()
+{
+	//1.Initiate GPIO Module.
+	BspGpioInit();
+	ConnectorInit();
+
+	//2. Connect Uart
+}
+
+
+/*============================================================
+ * Function: GPIOInit()
+ * Description: Initilization of all of the GPIO used on board
+ * 1. Power on the GPIO module
+ * 2. Set the Pin Multiplexing control register, the value generated
+ *    by TI PIN Multiplex Utility Ver 1.0.1241.34
+ * 3. Set the GPIO direction
+ * Paras:
+ * 		>>
+ * Return:
+ * 		>>
+ * Change Record:
+ *		>> (11/Dec/2017): Creation of the function
+ *============================================================*/
+//void GPIOInit()
+//{
+//	//1.Power control the GPIO module
+//	PSCModuleControl(SOC_PSC_1_REGS,HW_PSC_GPIO,PSC_POWERDOMAIN_ALWAYS_ON,PSC_MDCTL_NEXT_ENABLE);
+//	//TODO: Here check the state of module power on.
+//
+//
+//
+//	//2.Mutiplex Control
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(0)) = PINMUX0_VAL
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(1)) = PINMUX1_VAL
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(3)) = PINMUX3_VAL;
+//
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(4)) = PINMUX4_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(5)) = PINMUX5_VAL;
+//
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(10)) = PINMUX10_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(11)) = PINMUX11_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(13)) = PINMUX13_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(14)) = PINMUX14_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(15)) = PINMUX15_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(16)) = PINMUX16_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(17)) = PINMUX17_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(18)) = PINMUX18_VAL;
+//	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(19)) = PINMUX19_VAL;
+//
+//	//3.Set GPIOs Direction
+//	// *Check GPIO information on maunal: GPIODefinition.docx.
+//	GPIODirModeSet(SOC_GPIO_0_REGS,SW_FEED_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,SW_CLK_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,SW_SERIAL_PIN,GPIO_DIR_INPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,ADC1_CH_SEL0,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,ADC1_CH_SEL1,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,ADC1_CH_SEL2,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,SYNC_IN_PIN,GPIO_DIR_INPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,SYNC_OUT_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO1_STATE_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO2_STATE_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO3_STATE_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO4_STATE_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO1_STOP_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO2_STOP_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO3_STOP_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO4_STOP_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO1_PWM_EN_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO2_PWM_EN_PIN,GPIO_DIR_INPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO3_PWM_EN_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO4_PWM_EN_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO_CAP_SFTCLK_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO_CAP_LCHCLK_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO_CAP_SDI_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO_CAP_RST_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO_CAP_OE_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO1_ERR_LED_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO2_ERR_LED_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO3_ERR_LED_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LACO4_ERR_LED_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,SYS_STATE_LED_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,TDC1_EN_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,TDC1_INT1_PIN,GPIO_DIR_INPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,TDC1_INT2_PIN,GPIO_DIR_INPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,TDC2_EN_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,TDC2_INT1_PIN,GPIO_DIR_INPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,TDC2_INT2_PIN,GPIO_DIR_INPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,MMC_DETECT_PIN,GPIO_DIR_INPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,WATCHDOG_FEED_PIN,GPIO_DIR_OUTPUT);
+//	GPIODirModeSet(SOC_GPIO_0_REGS,LAN_INT_PIN,GPIO_DIR_INPUT);
+//}
+
