@@ -56,14 +56,25 @@ typedef  struct{
     EDMA3CCPaRAMEntry param_set_rd;
 }dma_internal_t;
 
+//a channel structure for tdc
+typedef struct tdc_channel_t{
+	uint8_t ch_no; // channel number
+	uint16_t set_cs_cmd; //cs value for every channel
+	struct tdc_channel_t * next;
+}tdc_channel_t;
 
 //Internal data strucutre.
 typedef  struct {
     uint8_t dev_id;
-    uint16_t set_cs_cmd;
-    uint8_t cfg1;
+    uint8_t cfg1; //used to save the cfg1 reg number
     uint8_t cfg2;
     uint8_t cali_period;
+
+    tdc_channel_t * ch1;
+    tdc_channel_t * ch2;
+    tdc_channel_t * ch3;
+    tdc_channel_t * ch0;
+    tdc_channel_t * curr;
 
     spi_handle_t * spi_handle;
     //A dma structure
@@ -78,8 +89,6 @@ typedef  struct {
  *=========================================*/
 static void TdcHandleInit(tdc_handle_t * handle, tdc_conf_t * ptr_conf);
 static void TdcPscGpioInit(tdc_handle_t * handle);
-static void TdcDisable(tdc_handle_t * handle);
-static void TdcEnable(tdc_handle_t * handle);
 static void TdcCalc(tdc_handle_t * handle, int index, uint32_t *result);
 static uint8_t TdcReadReg(tdc_handle_t * handle, uint16_t addr);
 static void TdcReadRegSeq(tdc_handle_t * handle, uint16_t addr, uint8_t num);
@@ -111,12 +120,11 @@ static void TdcDmaInit(tdc_handle_t * handle);
 void DrvTdcInit(tdc_handle_t * handle,
                 void * ptr_conf)
 {
-    //Initialize the tdc_handle_t structure
-    TdcHandleInit(handle,(tdc_conf_t *)ptr_conf);
+
     //Config the psc and GPIO
     TdcPscGpioInit(handle);
-
-    DrvTdcEnable(handle);
+	//Initialize the tdc_handle_t structure
+    TdcHandleInit(handle,(tdc_conf_t *)ptr_conf);
 }
 
 
@@ -150,24 +158,48 @@ static void TdcHandleInit(tdc_handle_t * handle, tdc_conf_t * ptr_conf)
 	{
 		ptr_internal->spi_handle = (spi_handle_t *)comm;
 	}
-    handle->dev_id = ptr_conf->dev_id;
+    //handle->dev_id = ptr_conf->dev_id;
 
-    switch(handle->dev_id)
-    {
-        case 0: ptr_internal->set_cs_cmd = TDC1_CS1_NUM;
-            break;
-        case 1: ptr_internal->set_cs_cmd = TDC1_CS2_NUM;
-            break;
-        case 2: ptr_internal->set_cs_cmd = TDC2_CS1_NUM;
-            break;
-        case 3: ptr_internal->set_cs_cmd = TDC2_CS2_NUM;
-            break;
-        default: break;
-    }
+	//create channel struct
+	ptr_internal->ch1 = (tdc_channel_t *)malloc(sizeof(tdc_channel_t));
+	ptr_internal->ch2 = (tdc_channel_t *)malloc(sizeof(tdc_channel_t));
+	ptr_internal->ch3 = (tdc_channel_t *)malloc(sizeof(tdc_channel_t));
+	ptr_internal->ch0 = (tdc_channel_t *)malloc(sizeof(tdc_channel_t));
+
+	ptr_internal->ch0->ch_no = 0;
+	ptr_internal->ch1->ch_no = 1;
+	ptr_internal->ch2->ch_no = 2;
+	ptr_internal->ch3->ch_no = 3;
+
+	ptr_internal->ch0->set_cs_cmd = TDC1_CS1_NUM;
+	ptr_internal->ch1->set_cs_cmd = TDC1_CS2_NUM;
+	ptr_internal->ch2->set_cs_cmd = TDC2_CS1_NUM;
+	ptr_internal->ch3->set_cs_cmd = TDC2_CS2_NUM;
+
+	ptr_internal->ch0->next = ptr_internal->ch1;
+	ptr_internal->ch1->next = ptr_internal->ch2;
+	ptr_internal->ch2->next = ptr_internal->ch3;
+	ptr_internal->ch3->next = ptr_internal->ch0;
+
+	ptr_internal->curr = ptr_internal->ch0;
+
+//    switch(handle->dev_id)
+//    {
+//        case 0: ptr_internal->set_cs_cmd = TDC1_CS1_NUM;
+//            break;
+//        case 1: ptr_internal->set_cs_cmd = TDC1_CS2_NUM;
+//            break;
+//        case 2: ptr_internal->set_cs_cmd = TDC2_CS1_NUM;
+//            break;
+//        case 3: ptr_internal->set_cs_cmd = TDC2_CS2_NUM;
+//            break;
+//        default: break;
+//    }
 
     //Configuration TDC
     ptr_internal->cfg1 = TdcReadReg(handle, TDC_CFG1);
     ptr_internal->cfg2 = TdcReadReg(handle, TDC_CFG2);
+
     if(ptr_conf->is_rising_edge == true)
     {
         ptr_internal->cfg1 &= 0xe7;
@@ -208,9 +240,19 @@ static void TdcHandleInit(tdc_handle_t * handle, tdc_conf_t * ptr_conf)
     //number of stop setting.
     ptr_internal->cfg2 &= 0xf8;
     ptr_internal->cfg2 |= (ptr_conf->stop_number - 1);
-    //write to tdc register
+    //write to tdc register: ch0
     TdcWriteReg(handle, TDC_CFG1, ptr_internal->cfg1);
     TdcWriteReg(handle, TDC_CFG2, ptr_internal->cfg2);
+    DrvTdcNextChannel(handle);
+    TdcWriteReg(handle, TDC_CFG1, ptr_internal->cfg1);
+    TdcWriteReg(handle, TDC_CFG2, ptr_internal->cfg2);
+    DrvTdcNextChannel(handle);
+    TdcWriteReg(handle, TDC_CFG1, ptr_internal->cfg1);
+    TdcWriteReg(handle, TDC_CFG2, ptr_internal->cfg2);
+    DrvTdcNextChannel(handle);
+    TdcWriteReg(handle, TDC_CFG1, ptr_internal->cfg1);
+    TdcWriteReg(handle, TDC_CFG2, ptr_internal->cfg2);
+    DrvTdcNextChannel(handle);
 }
 
 /*============================================================
@@ -232,55 +274,42 @@ static void TdcPscGpioInit(tdc_handle_t * handle)
 {
     uint32_t save_pin_mux;
 
-    if(handle->dev_id < 2)
-    {
-         //Set the EN PINs
-        // gpio mutex Setting
-        save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_EN_PIN_MUX_NUM)) &
-	 				  ~TDC1_EN_PIN_MUX_LOC);
-        HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_EN_PIN_MUX_NUM)) =
-			 	 	 (TDC1_EN_PIN_MUX_VAL | save_pin_mux);
-        //set to output
-        GPIODirModeSet(SOC_GPIO_0_REGS, TDC1_EN_PIN, GPIO_DIR_OUTPUT);
-    }
-    else
-    {
-        save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_EN_PIN_MUX_NUM)) &
-	 				  ~TDC2_EN_PIN_MUX_LOC);
-        HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_EN_PIN_MUX_NUM)) =
-			 	 	 (TDC2_EN_PIN_MUX_VAL | save_pin_mux);
-        GPIODirModeSet(SOC_GPIO_0_REGS, TDC2_EN_PIN, GPIO_DIR_OUTPUT);
-    }
+	 //Set the EN PINs
+	// gpio mutex Setting
+	save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_EN_PIN_MUX_NUM)) &
+				  ~TDC1_EN_PIN_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_EN_PIN_MUX_NUM)) =
+				 (TDC1_EN_PIN_MUX_VAL | save_pin_mux);
+	//set to output
+	GPIODirModeSet(SOC_GPIO_0_REGS, TDC1_EN_PIN, GPIO_DIR_OUTPUT);
+	save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_EN_PIN_MUX_NUM)) &
+				  ~TDC2_EN_PIN_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_EN_PIN_MUX_NUM)) =
+				 (TDC2_EN_PIN_MUX_VAL | save_pin_mux);
+	GPIODirModeSet(SOC_GPIO_0_REGS, TDC2_EN_PIN, GPIO_DIR_OUTPUT);
 
-    switch(handle->dev_id)
-    {
-        case 0: //Set the INT pins
-            save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_INT1_PIN_MUX_NUM)) &
-	 				  ~TDC1_INT1_PIN_MUX_LOC);
-            HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_INT1_PIN_MUX_NUM)) =
-			 	 	 (TDC1_INT1_PIN_MUX_VAL | save_pin_mux);
-            GPIODirModeSet(SOC_GPIO_0_REGS, TDC1_INT1_PIN, GPIO_DIR_INPUT); break;
-        case 1:
-            save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_INT2_PIN_MUX_NUM)) &
-	 				  ~TDC1_INT2_PIN_MUX_LOC);
-            HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_INT2_PIN_MUX_NUM)) =
-			 	 	 (TDC1_INT2_PIN_MUX_VAL | save_pin_mux);
-            GPIODirModeSet(SOC_GPIO_0_REGS, TDC1_INT2_PIN, GPIO_DIR_INPUT); break;
-        case 2:
-            save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_INT1_PIN_MUX_NUM)) &
-	 				  ~TDC2_INT1_PIN_MUX_LOC);
-            HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_INT1_PIN_MUX_NUM)) =
-			 	 	 (TDC2_INT1_PIN_MUX_VAL | save_pin_mux);
-            GPIODirModeSet(SOC_GPIO_0_REGS, TDC2_INT1_PIN, GPIO_DIR_INPUT); break;
-        case 3:
-            save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_INT2_PIN_MUX_NUM)) &
-	 				  ~TDC2_INT2_PIN_MUX_LOC);
-            HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_INT2_PIN_MUX_NUM)) =
-			 	 	 (TDC2_INT2_PIN_MUX_VAL | save_pin_mux);
-            GPIODirModeSet(SOC_GPIO_0_REGS, TDC2_INT2_PIN, GPIO_DIR_INPUT); break;
-        default: break;
-    }
+	save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_INT1_PIN_MUX_NUM)) &
+			  ~TDC1_INT1_PIN_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_INT1_PIN_MUX_NUM)) =
+			 (TDC1_INT1_PIN_MUX_VAL | save_pin_mux);
+	GPIODirModeSet(SOC_GPIO_0_REGS, TDC1_INT1_PIN, GPIO_DIR_INPUT);
+	save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_INT2_PIN_MUX_NUM)) &
+			  ~TDC1_INT2_PIN_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC1_INT2_PIN_MUX_NUM)) =
+			 (TDC1_INT2_PIN_MUX_VAL | save_pin_mux);
+	GPIODirModeSet(SOC_GPIO_0_REGS, TDC1_INT2_PIN, GPIO_DIR_INPUT);
+	save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_INT1_PIN_MUX_NUM)) &
+			  ~TDC2_INT1_PIN_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_INT1_PIN_MUX_NUM)) =
+			 (TDC2_INT1_PIN_MUX_VAL | save_pin_mux);
+	GPIODirModeSet(SOC_GPIO_0_REGS, TDC2_INT1_PIN, GPIO_DIR_INPUT);
+	save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_INT2_PIN_MUX_NUM)) &
+			  ~TDC2_INT2_PIN_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(TDC2_INT2_PIN_MUX_NUM)) =
+			 (TDC2_INT2_PIN_MUX_VAL | save_pin_mux);
+	GPIODirModeSet(SOC_GPIO_0_REGS, TDC2_INT2_PIN, GPIO_DIR_INPUT);
     //Enable GPIO BANK 0 interrupt. TODO:
+	DrvTdcEnable(handle);
 }
 
 
@@ -304,7 +333,7 @@ static uint8_t TdcReadReg(tdc_handle_t * handle, uint16_t addr)
 
     ptr_internal = (tdc_internal_t *)(handle->ptr_internal);
     ptr_internal->spi_handle->SetCs(
-                ptr_internal->spi_handle, ptr_internal->set_cs_cmd);
+                ptr_internal->spi_handle, ptr_internal->curr->set_cs_cmd);
 
     //first write to register
     ptr_internal->spi_handle->Write(ptr_internal->spi_handle, addr);
@@ -339,9 +368,8 @@ static void TdcReadRegSeq(tdc_handle_t * handle, uint16_t addr, uint8_t num)
     uint16_t * data = &ptr_internal->dma.rd_buffer[0];
 
     addr = addr << 8;
-    ptr_internal->spi_handle->SetCs(
-                    ptr_internal->spi_handle, ptr_internal->set_cs_cmd);
-    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, true);
+    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, true,
+    		ptr_internal->curr->set_cs_cmd);
     ptr_internal->spi_handle->Write(ptr_internal->spi_handle, addr|AUTO_INCREMENT);
     for(cnt = 0;cnt < num-1; cnt++)
     {
@@ -350,7 +378,8 @@ static void TdcReadRegSeq(tdc_handle_t * handle, uint16_t addr, uint8_t num)
     	data[cnt] = ptr_internal->spi_handle->Read(ptr_internal->spi_handle);
     }
     data[cnt] = ptr_internal->spi_handle->Read(ptr_internal->spi_handle);
-    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, false);
+    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, false,
+    		ptr_internal->curr->set_cs_cmd);
 }
 
 /*============================================================
@@ -376,8 +405,6 @@ static void TdcReadRegSeqDma(tdc_handle_t * handle)
     spi_handle_t * spi_handle = ptr_internal->spi_handle;
 
     ptr_internal = (tdc_internal_t *)(handle->ptr_internal);
-    spi_handle->SetCs(ptr_internal->spi_handle,
-    				ptr_internal->set_cs_cmd);
 
 	//1 - Clear the Event and Event error
 	EDMA3ClrMissEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_WR);
@@ -392,7 +419,7 @@ static void TdcReadRegSeqDma(tdc_handle_t * handle)
 					&ptr_internal->dma.param_set_rd);
 
 	//3 - Prepare for SPI
-	spi_handle->CsHold(ptr_internal->spi_handle, true);
+	spi_handle->CsHold(ptr_internal->spi_handle, true, ptr_internal->curr->set_cs_cmd);
 	//4 - Enable event/Start DMA control
 	EDMA3EnableDmaEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_RD);
 	EDMA3EnableDmaEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_WR);
@@ -402,7 +429,7 @@ static void TdcReadRegSeqDma(tdc_handle_t * handle)
 	while(!(HWREG(SOC_EDMA30CC_0_REGS+0x1068)&0x00000002));
 	HWREG(SOC_EDMA30CC_0_REGS+0x1070) = 0x000000002;
 	//7 - Stop the spi cs_hold mode and disable event
-	spi_handle->CsHold(ptr_internal->spi_handle, false);
+	spi_handle->CsHold(ptr_internal->spi_handle, false, ptr_internal->curr->set_cs_cmd);
 	EDMA3DisableDmaEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_WR);
 	EDMA3DisableDmaEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_RD);
 }
@@ -439,14 +466,8 @@ static void TdcWriteReg(tdc_handle_t * handle, uint16_t addr, uint8_t val)
  *============================================================*/
 void DrvTdcEnable(tdc_handle_t * handle)
 {
-    if(handle->dev_id < 2)
-    {
         GPIOPinWrite(SOC_GPIO_0_REGS, TDC1_EN_PIN,0x01);
-    }
-    else
-    {
         GPIOPinWrite(SOC_GPIO_0_REGS, TDC2_EN_PIN,0x01);
-    }
 }
 
 /*============================================================
@@ -463,15 +484,8 @@ void DrvTdcEnable(tdc_handle_t * handle)
  *============================================================*/
  void DrvTdcDisable(tdc_handle_t * handle)
 {
-    if(handle->dev_id < 2)
-    {
-        GPIOPinWrite(SOC_GPIO_0_REGS, TDC1_EN_PIN,0x00);
-    }
-    else
-    {
-        GPIOPinWrite(SOC_GPIO_0_REGS, TDC2_EN_PIN,0x00);
-    }
-
+    GPIOPinWrite(SOC_GPIO_0_REGS, TDC1_EN_PIN,0x00);
+    GPIOPinWrite(SOC_GPIO_0_REGS, TDC2_EN_PIN,0x00);
 }
 
 /*============================================================
@@ -911,7 +925,8 @@ void DrvTdcStart(tdc_handle_t * handle)
 	 tdc_internal_t * ptr_internal = (tdc_internal_t *)handle->ptr_internal;
 
 	 DrvTdcEnterAutoMode(handle);
-	 ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle,true);
+	 ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle,true,
+			 ptr_internal->curr->set_cs_cmd);
 	 SPIIntEnable(ptr_internal->spi_handle->base_addr, SPI_DMA_REQUEST_ENA_INT);
   }
 
@@ -1020,3 +1035,23 @@ void DrvTdcStart(tdc_handle_t * handle)
 //	  			(tdc_internal_t *)handle->ptr_internal;
 //		ptr_internal->spi_handle = (spi_handle_t *)comm;
   }
+
+
+  /*============================================================
+    * Function: DrvTdcNextChannel
+    * Description: Set to next channel
+    *
+    * Para:
+    *    >> tdc_handle_t : a tdc7201 handle
+    * Return:
+    *     >>
+    * Change Record:
+    *		>> (01/Mar/2018): Creation of the function;
+    *
+    *============================================================*/
+   void DrvTdcNextChannel(tdc_handle_t * handle)
+   {
+ 		tdc_internal_t * ptr_internal =
+ 	  			(tdc_internal_t *)handle->ptr_internal;
+ 		ptr_internal->curr = ptr_internal->curr->next;
+   }

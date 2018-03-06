@@ -139,18 +139,21 @@ void DrvSpiSetCs(spi_handle_t * handle, uint8_t cs);
 
 
 /*============================================================
- * Function: SpiCsHold()
+ * Function: DrvSpiCsHold()
  * Description: CS hold Configuration.
  * Para:
  *    >> spi_conf_t * ptr: spi configuration structure
  *    >> bool_t: set (1) or clear CS hold bit.
+ *    >> uint8_t: the corresponding cs pin that need to use next time
+ *                cs = 0, cs_0; cs = 1, cs_1; cs = 2, cs_2;
+ *                cs = 3, cs_3, ....
  * Return:
  *     >>
  * Change Record:
  *		>> (08/Jan/2018): Creation and realization;
  *
  *============================================================*/
-void DrvSpiCsHold(spi_handle_t * handle, bool_t cs_hold);
+void DrvSpiCsHold(spi_handle_t * handle, bool_t is_cs_hold, uint8_t cs);
 
 
 #endif /* BSP_DRIVERS_COMMON_SPI_SPI_H_ */

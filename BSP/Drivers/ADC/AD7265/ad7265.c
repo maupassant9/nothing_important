@@ -66,7 +66,7 @@ typedef struct {
  *		>> (07/Jan/2018): Creation of the function;
  *
  *============================================================*/
- void DrvAd7253Init(adc_handle_t * handle, void * conf)
+ void DrvAd7265Init(adc_handle_t * handle, void * conf)
  {
     adc_internal_t * ptr_internal;
     spi_handle_t *spi_handle = handle->ptr_internal;
@@ -125,30 +125,15 @@ typedef struct {
 
    	ptr_internal->curr_ch = ptr_internal->ch1;
 
+   	spi_handle->SetCs(spi_handle,0x01);
  }
 
-/*============================================================
- * Function:  Mcp3021Read
- * Description:  Read MCP3021.
- * the channel chain configuration in conf is ignored because
- * MCP3021 has only one channel.
- * Para:
- *    >> adc_handle_t :  an adc handle.
- * Return:
- *     >>
- * Change Record:
- *		>> (07/Jan/2018): Creation of the function;
- *
- *============================================================*/
-uint16_t Ad7253Read(adc_handle_t * handle)
-{
-	return 0;
-}
+
 
 /*============================================================
- * Function:  DrvMcp3021Start
- * Description:  Start conversion, mcp3021 start conversion is
- * initialized when soc get result through i2c, this function
+ * Function:  DrvAd7265Start
+ * Description:  Start conversion, AD7265 start S/H and conversion.
+ * It is initialized when soc r/w through spi, this function
  * will get the result and save it in a memory area in internal
  * memory.
  * Para:
@@ -159,7 +144,7 @@ uint16_t Ad7253Read(adc_handle_t * handle)
  *		>> (07/Jan/2018): Creation of the function;
  *
  *============================================================*/
-void DrvAd7253Start(adc_handle_t * handle)
+void DrvAd7265Start(adc_handle_t * handle)
 {
 	uint16_t res[2];
 
@@ -168,41 +153,41 @@ void DrvAd7253Start(adc_handle_t * handle)
 
 	spi_handle_t *spi_handle = ptr_internal->spi_handle;
 
-	spi_handle->SetCs(spi_handle,0x01);
-	spi_handle->CsHold(spi_handle,1);
+	res[0] = 0; res[1] = 0;
+	//spi_handle->SetCs(spi_handle,0x01);
+	spi_handle->CsHold(spi_handle,1, 0x01); //TODO:
 	spi_handle->Write(spi_handle,0x00);
 	res[0] = spi_handle->Read(spi_handle);
 	spi_handle->Write(spi_handle,0x00);
 	res[1] = spi_handle->Read(spi_handle);
+	spi_handle->CsHold(spi_handle,0,0x01); //TODO: changed here. CsHold function more params
 
 	//TODO: need to check the value;
-
 	ptr_internal->data[0] = res[0]>>2;
 	ptr_internal->data[1] = res[1]>>2;
 }
 
 /*============================================================
- * Function:  DrvMcp3021GetResult
- * Description: Return the value saved in ptr_internal->conv.
+ * Function:  DrvAd7265GetResult
+ * Description: Return the value saved in ptr_internal->data.
  * Para:
  *    >> adc_handle_t :  an adc handle.
- *    >> uint8_t: channel A: 0
- *    			  channel B: 1
+ *    >> uint32_t *: the data will be copied into this address.
+ *    	 XXXX XXXX XXXX XXXX
+ *    	 |<-CHA->| |<-CHB->|
  * Return:
  *     >>
  * Change Record:
  *		>> (07/Jan/2018): Creation of the function;
  *
  *============================================================*/
-void DrvAd7253GetResult(adc_handle_t * handle, uint32_t * val)
+void DrvAd7265GetResult(adc_handle_t * handle, uint32_t * val)
 {
 	adc_internal_t * ptr_internal =
 					(adc_internal_t *)(handle->ptr_internal);
 
-	val[0] = (uint32_t)ptr_internal->data[0];
-	val[0] = val[0] >> 2;
-	val[1] = (uint32_t)ptr_internal->data[1];
-	val[1] = val[1] >> 2;
+	*val = (((uint32_t)ptr_internal->data[0]) << 16);
+	*val += (uint32_t)ptr_internal->data[1];
 }
 
 /*============================================================
@@ -251,7 +236,7 @@ void DrvAd7265NextChannel(adc_handle_t * handle)
 	}
 }
 /*============================================================
- * Function:  DrvMcp3021Disable
+ * Function:  DrvAd7265Disable
  * Description: Disable the MCP3021, not supported, no effect
  * Para:
  *    >> adc_handle_t :  an adc handle.
@@ -262,7 +247,7 @@ void DrvAd7265NextChannel(adc_handle_t * handle)
  *
  *============================================================*/
 /*============================================================
- * Function:  DrvMcp3021EnterAutoMode
+ * Function:  DrvAd7265EnterAutoMode
  * Description: Enter automatic mode, using DMA
  * Not supported, and no effect
  * Para:
@@ -273,7 +258,7 @@ void DrvAd7265NextChannel(adc_handle_t * handle)
  *		>> (07/Jan/2018): Creation of the function;
  *
  *============================================================*/
-void DrvAd7253NotSupported(adc_handle_t * handle)
+void DrvAd7265NotSupported(adc_handle_t * handle)
 {
     //not supported, no effect at all.
 }
@@ -291,7 +276,7 @@ void DrvAd7253NotSupported(adc_handle_t * handle)
  *		>> (08/Jan/2018): Creation of the function;
  *
  *============================================================*/
-void DrvAd7253Link(adc_handle_t * handle, void * comm)
+void DrvAd7265Link(adc_handle_t * handle, void * comm)
 {
     handle->ptr_internal = comm;
 }

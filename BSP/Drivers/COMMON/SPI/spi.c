@@ -199,26 +199,31 @@ void DrvSpiSetCs(spi_handle_t * handle, uint8_t cs)
  * Para:
  *    >> spi_conf_t * ptr: spi configuration structure
  *    >> bool_t: set (1) or clear CS hold bit.
+ *    >> uint8_t: the corresponding cs pin that need to use next time
+ *                cs = 0, cs_0; cs = 1, cs_1; cs = 2, cs_2;
+ *                cs = 3, cs_3, ....
  * Return:
  *     >>
  * Change Record:
  *		>> (08/Jan/2018): Creation and realization;
  *
  *============================================================*/
-void DrvSpiCsHold(spi_handle_t * handle, bool_t is_cs_hold)
+void DrvSpiCsHold(spi_handle_t * handle, bool_t is_cs_hold, uint8_t cs)
 {
 	spi_internal_t *ptr_internal;
 	ptr_internal = (spi_internal_t *)handle->ptr_spi_data;
 	// Selects the SPI Data format register to used
+	cs = 0x01 << cs;
+
 	if(is_cs_hold){
 		SPIDat1Config(ptr_internal->base_addr,
 				SPI_DATA_FORMAT0|SPI_CSHOLD,
-				ptr_internal->cs_cfg);
+				ptr_internal->cs_cfg&cs);
 	}
 	else{
 		SPIDat1Config(ptr_internal->base_addr,
 				SPI_DATA_FORMAT0,
-				ptr_internal->cs_cfg);
+				ptr_internal->cs_cfg&cs);
 	}
 }
 

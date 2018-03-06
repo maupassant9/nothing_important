@@ -11,6 +11,7 @@
 * 
 * 	Change Records: 
 *      >> (30/Jan/2018):finished
+*      >> (05/Mar/2018):Add stop pins
 * 
 */
 
@@ -55,6 +56,8 @@ typedef struct laco_struct_t{
     uint8_t id; //not used.
     //enable pin number
     uint8_t en_pin_number;
+    //stop pin number
+    uint8_t stp_pin_number;
     //intervalo of pwm wave.
     uint16_t len_interval; 
     struct laco_struct_t * next;
@@ -109,6 +112,7 @@ static uint16_t hc595_pins[5];
  *  >> 
  * Change Records:
  *  >> (30/Jan/2018): Create the function
+ *  >> (05/Mar/2018): Add Stop pins
  *----------------------------------------------*/
 void DrvLacoInit(lacos_handle_t * handle)
 {
@@ -125,7 +129,7 @@ void DrvLacoInit(lacos_handle_t * handle)
     Hc595Init();
     Hc595Write(ptr_internal->caps_val);
 
-    //2 - Initiate other gpios: LACO enable pins
+    //2 - Initiate other gpios: LACO enable pins and Disable pins
     //2.1 - set gpio mutex.
     save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO1_EN_MUX_NUM)) &
 	 				  ~LACO1_EN_MUX_LOC);
@@ -144,6 +148,25 @@ void DrvLacoInit(lacos_handle_t * handle)
 	 				  ~LACO4_EN_MUX_LOC);
 	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO4_EN_MUX_NUM)) =
 			 	 	 (LACO4_EN_MUX_VAL | save_pin_mux);
+
+    save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO1_STOP_MUX_NUM)) &
+	 				  ~LACO1_STOP_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO1_STOP_MUX_NUM)) =
+			 	 	 (LACO1_STOP_MUX_VAL | save_pin_mux);
+
+    save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO2_STOP_MUX_NUM)) &
+	 				  ~LACO2_STOP_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO2_STOP_MUX_NUM)) =
+			 	 	 (LACO2_STOP_MUX_VAL | save_pin_mux);
+    save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO3_STOP_MUX_NUM)) &
+	 				  ~LACO3_STOP_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO3_STOP_MUX_NUM)) =
+			 	 	 (LACO3_STOP_MUX_VAL | save_pin_mux);
+    save_pin_mux = (HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO4_STOP_MUX_NUM)) &
+	 				  ~LACO4_STOP_MUX_LOC);
+	HWREG(SOC_SYSCFG_0_REGS + SYSCFG0_PINMUX(LACO4_STOP_MUX_NUM)) =
+			 	 	 (LACO4_STOP_MUX_VAL | save_pin_mux);
+
     //2.2 - set gpios to OUTPUT mode.
     GPIODirModeSet(SOC_GPIO_0_REGS,LACO1_EN_PIN,GPIO_DIR_OUTPUT);
     GPIODirModeSet(SOC_GPIO_0_REGS,LACO2_EN_PIN,GPIO_DIR_OUTPUT);
@@ -155,24 +178,38 @@ void DrvLacoInit(lacos_handle_t * handle)
     GPIOPinWrite(SOC_GPIO_0_REGS,LACO3_EN_PIN,0);
     GPIOPinWrite(SOC_GPIO_0_REGS,LACO4_EN_PIN,0);
 
+    GPIODirModeSet(SOC_GPIO_0_REGS,LACO1_STOP_PIN,GPIO_DIR_OUTPUT);
+    GPIODirModeSet(SOC_GPIO_0_REGS,LACO2_STOP_PIN,GPIO_DIR_OUTPUT);
+    GPIODirModeSet(SOC_GPIO_0_REGS,LACO3_STOP_PIN,GPIO_DIR_OUTPUT);
+    GPIODirModeSet(SOC_GPIO_0_REGS,LACO4_STOP_PIN,GPIO_DIR_OUTPUT);
+    //2.3 - Set gpios output as low.
+    GPIOPinWrite(SOC_GPIO_0_REGS,LACO1_STOP_PIN,0);
+    GPIOPinWrite(SOC_GPIO_0_REGS,LACO2_STOP_PIN,0);
+    GPIOPinWrite(SOC_GPIO_0_REGS,LACO3_STOP_PIN,0);
+    GPIOPinWrite(SOC_GPIO_0_REGS,LACO4_STOP_PIN,0);
+
     //3 - Initiate the laco internal structure
     ptr_internal->laco1.id = 1;
     ptr_internal->laco1.en_pin_number = LACO1_EN_PIN;
+    ptr_internal->laco1.stp_pin_number = LACO1_STOP_PIN;
     ptr_internal->laco1.next = &ptr_internal->laco2;
     ptr_internal->laco1.len_interval = handle->lacos_pwm_len[0];
     
     ptr_internal->laco2.id = 2;
     ptr_internal->laco2.en_pin_number = LACO2_EN_PIN;
+    ptr_internal->laco2.stp_pin_number = LACO2_STOP_PIN;
     ptr_internal->laco2.next = &ptr_internal->laco3;
     ptr_internal->laco2.len_interval = handle->lacos_pwm_len[1];
 
     ptr_internal->laco3.id = 3;
     ptr_internal->laco3.en_pin_number = LACO3_EN_PIN;
+    ptr_internal->laco3.stp_pin_number = LACO3_STOP_PIN;
     ptr_internal->laco3.next = &ptr_internal->laco4;
     ptr_internal->laco3.len_interval = handle->lacos_pwm_len[2];
 
     ptr_internal->laco4.id = 4;
     ptr_internal->laco4.en_pin_number = LACO4_EN_PIN;
+    ptr_internal->laco4.stp_pin_number = LACO4_STOP_PIN;
     ptr_internal->laco4.next = &ptr_internal->laco1;
     ptr_internal->laco4.len_interval = handle->lacos_pwm_len[3];
 
@@ -199,6 +236,7 @@ void DrvLacoInit(lacos_handle_t * handle)
  *     >>
  * Change Record:
  *		>> (30/Jan/2018): Creation of the function;
+ *		>> (05/Mar/2018): Add stop pin
  *
  *============================================================*/
  static void LacoEnable(lacos_handle_t *handle)
@@ -207,18 +245,23 @@ void DrvLacoInit(lacos_handle_t * handle)
 
     ptr_internal = (lacos_internal_t *)handle->ptr_internal;
     GPIOPinWrite(SOC_GPIO_0_REGS,
+                        ptr_internal->current->stp_pin_number,0);
+    GPIOPinWrite(SOC_GPIO_0_REGS,
                 ptr_internal->current->en_pin_number,1);
  }
 
 /*============================================================
  * Function: LacoDisable
- * Description: Disable the current laco
+ * Description: Disable the current laco:
+ * 		Disable the enable pin to disable pwm signal
+ * 		Enable the stp pin to clear the signal in laco
  * Para:
  *    >> laco_handle :  handle of laco
  * Return:
  *     >>
  * Change Record:
  *		>> (30/Jan/2018): Creation of the function;
+ *		>> (05/Mar/2018): Add stop pin
  *
  *============================================================*/
  static void LacoDisable(lacos_handle_t *handle)
@@ -226,6 +269,8 @@ void DrvLacoInit(lacos_handle_t * handle)
     lacos_internal_t * ptr_internal;
 
     ptr_internal = (lacos_internal_t *)handle->ptr_internal;
+    GPIOPinWrite(SOC_GPIO_0_REGS,
+                    ptr_internal->current->stp_pin_number,1);
     GPIOPinWrite(SOC_GPIO_0_REGS,
                 ptr_internal->current->en_pin_number,0);
  }
@@ -248,12 +293,14 @@ void DrvLacoInit(lacos_handle_t * handle)
     lacos_internal_t * ptr_internal;
 
     ptr_internal = (lacos_internal_t *)handle->ptr_internal;
+
     LacoDisable(handle);
     ptr_internal->current = ptr_internal->current->next;
     ptr_internal->pwm_handle->SetPulseWidth(ptr_internal->pwm_handle,
     						ptr_internal->current->len_interval);
     //TODO: enable the next laco??
     LacoEnable(handle);
+
  }
 
 

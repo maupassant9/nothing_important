@@ -33,7 +33,9 @@ extern Semaphore_Handle sem;
 board_handle_t * board;
 dyn_array_t * dyn_arr_comm;
 uint8_t cnt = 0;
-
+uint16_t res[1024];
+uint16_t res2[1024];
+uint32_t val[5], cnt2 = 0;
 /*
  *  ======== taskFxn ========
  */
@@ -50,6 +52,26 @@ void IsrClock()
 	board->leds->Update(board->leds);
 }
 
+void IsrAdc()
+{
+//	board->adc1->Start(board->adc1);
+//	board->adc1->GetResult(board->adc1, &val);
+//	res[cnt2] = (val>>16);
+//	res2[cnt2++] = val&0xffff;
+//	if(cnt2 == 1024)
+//	{
+//		cnt2 = 0;
+//	}
+
+	board->tdc->Start(board->tdc);
+	//chk tdc int here
+
+	board->tdc->GetResult(board->tdc, &val);
+	//point to next channel
+	//board->lacos->Next(board->lacos);
+	board->tdc->Next(board->tdc);
+
+}
 
 
 /*
@@ -64,13 +86,8 @@ Int main()
      * use ROV->SysMin to view the characters in the circular buffer
      */
     board = BoardInit();
+	//board->lacos->Start(board->lacos);
 
-//    while(1){
-//    	if(cap_val == 0) cap_val = 1;
-//    	board->lacos->SetCaps(board->lacos,laco_no,0x01);
-//    	cap_val = cap_val << 1;
-//    }
-    //dyn_arr_comm = DynamicArrayCreate();
     BIOS_start();    /* does not return */
     return(0);
 }

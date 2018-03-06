@@ -1924,8 +1924,11 @@ ti_sysbios_heaps_HeapTrack_Object__ ti_sysbios_heaps_HeapTrack_Object__table__V[
 /* --> IsrClock */
 extern xdc_Void IsrClock(xdc_UArg);
 
+/* --> IsrAdc */
+extern xdc_Void IsrAdc(xdc_UArg);
+
 /* Object__table__V */
-ti_sysbios_knl_Clock_Object__ ti_sysbios_knl_Clock_Object__table__V[1];
+ti_sysbios_knl_Clock_Object__ ti_sysbios_knl_Clock_Object__table__V[2];
 
 /* Module_State__ */
 typedef struct ti_sysbios_knl_Clock_Module_State__ {
@@ -6952,17 +6955,29 @@ ti_sysbios_knl_Clock_Module__ ti_sysbios_knl_Clock_Module__root__V = {
 };
 
 /* Object__table__V */
-ti_sysbios_knl_Clock_Object__ ti_sysbios_knl_Clock_Object__table__V[1] = {
+ti_sysbios_knl_Clock_Object__ ti_sysbios_knl_Clock_Object__table__V[2] = {
     {/* instance#0 */
         {
-            ((ti_sysbios_knl_Queue_Elem*)((void*)&ti_sysbios_knl_Clock_Module__state__V.Object_field_clockQ.elem)),  /* next */
+            ((ti_sysbios_knl_Queue_Elem*)((void*)&ti_sysbios_knl_Clock_Object__table__V[1].elem)),  /* next */
             ((ti_sysbios_knl_Queue_Elem*)((void*)&ti_sysbios_knl_Clock_Module__state__V.Object_field_clockQ.elem)),  /* prev */
         },  /* elem */
-        (xdc_UInt32)0x1,  /* timeout */
-        (xdc_UInt32)0x1,  /* currTimeout */
-        (xdc_UInt32)0x1,  /* period */
+        (xdc_UInt32)0x64,  /* timeout */
+        (xdc_UInt32)0x64,  /* currTimeout */
+        (xdc_UInt32)0x64,  /* period */
         1,  /* active */
         ((xdc_Void(*)(xdc_UArg))((xdc_Fxn)IsrClock)),  /* fxn */
+        ((xdc_UArg)0),  /* arg */
+    },
+    {/* instance#1 */
+        {
+            ((ti_sysbios_knl_Queue_Elem*)((void*)&ti_sysbios_knl_Clock_Module__state__V.Object_field_clockQ.elem)),  /* next */
+            ((ti_sysbios_knl_Queue_Elem*)((void*)&ti_sysbios_knl_Clock_Object__table__V[0].elem)),  /* prev */
+        },  /* elem */
+        (xdc_UInt32)0xa,  /* timeout */
+        (xdc_UInt32)0xa,  /* currTimeout */
+        (xdc_UInt32)0xa,  /* period */
+        1,  /* active */
+        ((xdc_Void(*)(xdc_UArg))((xdc_Fxn)IsrAdc)),  /* fxn */
         ((xdc_UArg)0),  /* arg */
     },
 };
@@ -6990,7 +7005,7 @@ ti_sysbios_knl_Clock_Module_State__ ti_sysbios_knl_Clock_Module__state__V = {
     {
         {
             ((ti_sysbios_knl_Queue_Elem*)((void*)&ti_sysbios_knl_Clock_Object__table__V[0].elem)),  /* next */
-            ((ti_sysbios_knl_Queue_Elem*)((void*)&ti_sysbios_knl_Clock_Object__table__V[0].elem)),  /* prev */
+            ((ti_sysbios_knl_Queue_Elem*)((void*)&ti_sysbios_knl_Clock_Object__table__V[1].elem)),  /* prev */
         },  /* elem */
     },  /* Object_field_clockQ */
 };
@@ -7053,7 +7068,7 @@ __FAR__ const CT__ti_sysbios_knl_Clock_Module__startupDoneFxn ti_sysbios_knl_Clo
 
 /* Object__count__C */
 #pragma DATA_SECTION(ti_sysbios_knl_Clock_Object__count__C, ".const:ti_sysbios_knl_Clock_Object__count__C");
-__FAR__ const CT__ti_sysbios_knl_Clock_Object__count ti_sysbios_knl_Clock_Object__count__C = 1;
+__FAR__ const CT__ti_sysbios_knl_Clock_Object__count ti_sysbios_knl_Clock_Object__count__C = 2;
 
 /* Object__heap__C */
 #pragma DATA_SECTION(ti_sysbios_knl_Clock_Object__heap__C, ".const:ti_sysbios_knl_Clock_Object__heap__C");
@@ -7105,7 +7120,7 @@ __FAR__ const CT__ti_sysbios_knl_Clock_timerId ti_sysbios_knl_Clock_timerId__C =
 
 /* tickPeriod__C */
 #pragma DATA_SECTION(ti_sysbios_knl_Clock_tickPeriod__C, ".const:ti_sysbios_knl_Clock_tickPeriod__C");
-__FAR__ const CT__ti_sysbios_knl_Clock_tickPeriod ti_sysbios_knl_Clock_tickPeriod__C = (xdc_UInt32)0x7a120;
+__FAR__ const CT__ti_sysbios_knl_Clock_tickPeriod ti_sysbios_knl_Clock_tickPeriod__C = (xdc_UInt32)0x1388;
 
 /* doTickFunc__C */
 #pragma DATA_SECTION(ti_sysbios_knl_Clock_doTickFunc__C, ".const:ti_sysbios_knl_Clock_doTickFunc__C");
@@ -8828,7 +8843,7 @@ ti_sysbios_timers_timer64_Timer_Object__ ti_sysbios_timers_timer64_Timer_Object_
         (xdc_UInt)0x0,  /* gpioDatDir */
         ti_sysbios_interfaces_ITimer_RunMode_CONTINUOUS,  /* runMode */
         ti_sysbios_interfaces_ITimer_StartMode_AUTO,  /* startMode */
-        (xdc_UInt)0x7a120,  /* period */
+        (xdc_UInt)0x1388,  /* period */
         ti_sysbios_interfaces_ITimer_PeriodType_MICROSECS,  /* periodType */
         (xdc_UInt)0x0,  /* prescalar */
         (xdc_UInt)0x17,  /* intNum */
@@ -18280,4 +18295,11 @@ const ti_sysbios_knl_Mailbox_Handle mailbox_comm = (ti_sysbios_knl_Mailbox_Handl
 #endif
 #endif
 const ti_sysbios_knl_Clock_Handle clock0 = (ti_sysbios_knl_Clock_Handle)((ti_sysbios_knl_Clock_Handle)&ti_sysbios_knl_Clock_Object__table__V[0]);
+
+#ifdef __GNUC__
+#ifndef __TI_COMPILER_VERSION__
+    __attribute__ ((externally_visible))
+#endif
+#endif
+const ti_sysbios_knl_Clock_Handle clock1 = (ti_sysbios_knl_Clock_Handle)((ti_sysbios_knl_Clock_Handle)&ti_sysbios_knl_Clock_Object__table__V[1]);
 

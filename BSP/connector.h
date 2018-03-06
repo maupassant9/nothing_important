@@ -197,7 +197,7 @@ struct spi_struct_t{
     //void (*AttachBuffer)(struct spi_struct_t *, bool_t,
     //                    void *,uint32_t);
     void (*SetCs)(struct spi_struct_t *, uint8_t);
-    void (*CsHold)(struct spi_struct_t *, bool_t);
+    void (*CsHold)(struct spi_struct_t *, bool_t, uint8_t);
 
 
 };
@@ -234,7 +234,7 @@ typedef struct {
     // CS pin value
     // for example, if this device connect with
     // spi CS4, then this value is 0x0100
-    uint8_t cs;
+    //uint8_t cs;
 
 } tdc_conf_t;
 
@@ -397,13 +397,7 @@ struct board_struct_t{
     //2 - adc handle: MCP3021
 	struct tdc_struct_t * adc2;
     //3 - tdc handle: TDC7201_1_CH1
-	struct tdc_struct_t * tdc1;
-    //4 - tdc handle: TDC7201_1_CH2
-	struct tdc_struct_t * tdc2;
-    //5 - tdc handle: TDC7201_2_CH1
-	struct tdc_struct_t * tdc3;
-    //6 - tdc_handle: TDC7201_2_CH2
-	struct tdc_struct_t * tdc4;
+	struct tdc_struct_t * tdc;
     //7 - dipswitch:
     struct ds_struct_t * dipswitch;
     //8 - laco: laco control

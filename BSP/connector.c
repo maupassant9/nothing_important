@@ -96,16 +96,16 @@ void ConnectorInit(board_handle_t *board)
     //ConnectUart(board->uart1);
 
     //Create 6 tdc handle
-    board->tdc1 = (tdc_handle_t *)malloc(sizeof(tdc_handle_t));
-    board->tdc2 = (tdc_handle_t *)malloc(sizeof(tdc_handle_t));
-    board->tdc3 = (tdc_handle_t *)malloc(sizeof(tdc_handle_t));
-    board->tdc4 = (tdc_handle_t *)malloc(sizeof(tdc_handle_t));
+    board->tdc = (tdc_handle_t *)malloc(sizeof(tdc_handle_t));
+//    board->tdc2 = (tdc_handle_t *)malloc(sizeof(tdc_handle_t));
+//    board->tdc3 = (tdc_handle_t *)malloc(sizeof(tdc_handle_t));
+//    board->tdc4 = (tdc_handle_t *)malloc(sizeof(tdc_handle_t));
     board->adc1 = (adc_handle_t *)malloc(sizeof(adc_handle_t));
     board->adc2 = (adc_handle_t *)malloc(sizeof(adc_handle_t));
-    ConnectTdc(board->tdc1);
-    ConnectTdc(board->tdc2);
-    ConnectTdc(board->tdc3);
-    ConnectTdc(board->tdc4);
+    ConnectTdc(board->tdc);
+//    ConnectTdc(board->tdc2);
+//    ConnectTdc(board->tdc3);
+//    ConnectTdc(board->tdc4);
     ConnectAdc1(board->adc1);
     ConnectAdc2(board->adc2);
 
@@ -150,10 +150,10 @@ void ConnectorInit(board_handle_t *board)
     ConnectI2C(i2c);
     i2c->Init(i2c,&i2c_conf);
 
-    board->tdc1->Link(board->tdc1, (void *)spi0);
-    board->tdc2->Link(board->tdc2, (void *)spi0);
-    board->tdc3->Link(board->tdc3, (void *)spi0);
-    board->tdc4->Link(board->tdc4, (void *)spi0);
+    board->tdc->Link(board->tdc, (void *)spi0);
+//    board->tdc2->Link(board->tdc2, (void *)spi0);
+//    board->tdc3->Link(board->tdc3, (void *)spi0);
+//    board->tdc4->Link(board->tdc4, (void *)spi0);
     board->adc1->Link(board->adc1, (void *)spi1);
     board->adc2->Link(board->adc2, (void *)i2c);
 
@@ -267,6 +267,7 @@ static void ConnectTdc(tdc_handle_t * tdc){
 	tdc->Disable = DrvTdcDisable;
 	tdc->EnterAutoMode = DrvTdcEnterAutoMode;
     tdc->Link = DrvTdcSetComm;
+    tdc->Next = DrvTdcNextChannel;
 }
 
 
@@ -324,13 +325,13 @@ static void ConnectI2C(i2c_handle_t * i2c)
  *============================================================*/
 static void ConnectAdc1(adc_handle_t * adc)
 {
-    adc->Init = DrvAd7253Init;
-    adc->Start = DrvAd7253Start;
-    adc->GetResult = DrvAd7253GetResult;
-    adc->Disable = DrvMcp3021NotSupported;
-    adc->Enable = DrvMcp3021NotSupported;
-    adc->EnterAutoMode = DrvMcp3021NotSupported;
-    adc->Link = DrvAd7253Link;
+    adc->Init = DrvAd7265Init;
+    adc->Start = DrvAd7265Start;
+    adc->GetResult = DrvAd7265GetResult;
+    adc->Disable = DrvAd7265NotSupported;
+    adc->Enable = DrvAd7265NotSupported;
+    adc->EnterAutoMode = DrvAd7265NotSupported;
+    adc->Link = DrvAd7265Link;
     adc->Next = DrvAd7265NextChannel;
 }
 

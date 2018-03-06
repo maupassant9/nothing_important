@@ -182,5 +182,19 @@ void DrvTdcDisable(tdc_handle_t * handle);
  *============================================================*/
 void DrvTdcSetComm(tdc_handle_t * handle, void * comm);
 
+/*============================================================
+  * Function: DrvTdcNextChannel
+  * Description: Set to next channel
+  *
+  * Para:
+  *    >> tdc_handle_t : a tdc7201 handle
+  * Return:
+  *     >>
+  * Change Record:
+  *		>> (01/Mar/2018): Creation of the function;
+  *
+  *============================================================*/
+ void DrvTdcNextChannel(tdc_handle_t * handle);
+
 
 #endif /* BSP_DRIVERS_TDC_TDC_H_ */

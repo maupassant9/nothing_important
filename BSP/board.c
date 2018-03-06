@@ -97,6 +97,12 @@ board_handle_t * BoardInit()
     " mcr p15, #0, r0, c1, c0, #0\n\t");
     board->uart0->WriteString(board->uart0,"Enter into SYS/BIOS...\n");
 
+
+//    board->adc1->Next(board->adc1);//CH 2
+//    board->adc1->Next(board->adc1);//CH 3
+//    board->adc1->Next(board->adc1);//CH 4
+//    board->adc1->Next(board->adc1);//CH 5
+//    board->adc1->Next(board->adc1);//CH 6
 	return board;
 }
 
@@ -227,62 +233,13 @@ static void TdcInit(board_handle_t * board)
 	tdc_conf_t tdc_conf;
 	// 1 - tdc 1
 	tdc_conf.dev_id = 0;
-	tdc_conf.cs = 2;
+	//tdc_conf.cs = 2;
 	tdc_conf.ptr_spi_handle = NULL;
-	tdc_conf.stop_number = 3;
+	tdc_conf.stop_number = 5;
 	tdc_conf.is_rising_edge = true;
 	tdc_conf.multi_cycle_aging = 1;
-	board->tdc1->Init(board->tdc1,&tdc_conf);
-	board->uart0->WriteString(board->uart0,"TDC1 init okay!\n");
-	board->uart0->WriteString(board->uart0,"tdc1 connected to TDC1_CHANNEL1\n");
-	board->uart0->WriteString(board->uart0,"Connection = SPI0\n");
-	board->uart0->WriteString(board->uart0,"RISING EDGE = TRUE\n");
-	board->uart0->WriteString(board->uart0,"MEASURE CYCLES = 1\n");
-	board->uart0->WriteString(board->uart0,"NUM STOP = 1\n");
-	board->uart0->WriteString(board->uart0,"CALI PERIODS = 2 (FIXED)\n");
-
-	// 2 - tdc 2
-	tdc_conf.dev_id = 1;
-	tdc_conf.cs = 3;
-	tdc_conf.ptr_spi_handle = NULL;
-	tdc_conf.stop_number = 3;
-	tdc_conf.is_rising_edge = true;
-	tdc_conf.multi_cycle_aging = 1;
-	board->tdc2->Init(board->tdc2,&tdc_conf);
-	board->uart0->WriteString(board->uart0,"TDC2 init okay!\n");
-	board->uart0->WriteString(board->uart0,"tdc2 connected to TDC1_CHANNEL2\n");
-	board->uart0->WriteString(board->uart0,"Connection = SPI0\n");
-	board->uart0->WriteString(board->uart0,"RISING EDGE = TRUE\n");
-	board->uart0->WriteString(board->uart0,"MEASURE CYCLES = 1\n");
-	board->uart0->WriteString(board->uart0,"NUM STOP = 1\n");
-	board->uart0->WriteString(board->uart0,"CALI PERIODS = 2 (FIXED)\n");
-
-	// 3 - tdc 3
-	tdc_conf.dev_id = 2;
-	tdc_conf.cs = 4;
-	tdc_conf.ptr_spi_handle = NULL;
-	tdc_conf.stop_number = 3;
-	tdc_conf.is_rising_edge = true;
-	tdc_conf.multi_cycle_aging = 1;
-	board->tdc3->Init(board->tdc3,&tdc_conf);
-	board->uart0->WriteString(board->uart0,"TDC3 init okay!\n");
-	board->uart0->WriteString(board->uart0,"tdc3 connected to TDC2_CHANNEL1\n");
-	board->uart0->WriteString(board->uart0,"Connection = SPI0\n");
-	board->uart0->WriteString(board->uart0,"RISING EDGE = TRUE\n");
-	board->uart0->WriteString(board->uart0,"MEASURE CYCLES = 1\n");
-	board->uart0->WriteString(board->uart0,"NUM STOP = 1\n");
-	board->uart0->WriteString(board->uart0,"CALI PERIODS = 2 (FIXED)\n");
-
-	// 4 - tdc 4
-	tdc_conf.dev_id = 3;
-	tdc_conf.cs = 5;
-	tdc_conf.ptr_spi_handle = NULL;
-	tdc_conf.stop_number = 3;
-	tdc_conf.is_rising_edge = true;
-	tdc_conf.multi_cycle_aging = 1;
-	board->tdc4->Init(board->tdc4,&tdc_conf);
-	board->uart0->WriteString(board->uart0,"TDC4 init okay!\n");
-	board->uart0->WriteString(board->uart0,"tdc4 connected to TDC2_CHANNEL2\n");
+	board->tdc->Init(board->tdc,&tdc_conf);
+	board->uart0->WriteString(board->uart0,"TDCs init okay!\n");
 	board->uart0->WriteString(board->uart0,"Connection = SPI0\n");
 	board->uart0->WriteString(board->uart0,"RISING EDGE = TRUE\n");
 	board->uart0->WriteString(board->uart0,"MEASURE CYCLES = 1\n");
@@ -353,7 +310,7 @@ static void UartInit(board_handle_t * board)
 static void AdcInit(board_handle_t * board)
 {
 	adc_conf_t adc_conf;
-	uint32_t cnt, res, val[2];
+	uint32_t cnt, res;
 	char str[10];
 
 	board->uart0->WriteString(board->uart0, "Initializing ADC1: AD7265...\n");
@@ -362,14 +319,13 @@ static void AdcInit(board_handle_t * board)
 	board->adc1->Init(board->adc1,(void *)&adc_conf);
 	for(cnt = 0; cnt < 6; cnt++)
 	{
-		board->adc1
 		board->adc1->Start(board->adc1);
-		board->adc1->GetResult(board->adc1, val);
-		itoa((5000*val[0])>>11, str, 10);
+		board->adc1->GetResult(board->adc1, &res);
+		itoa((5000*(res>>16))>>13, str, 10);
 		board->uart0->WriteString(board->uart0, "Val ADC(A) = ");
 		board->uart0->WriteString(board->uart0, str);
 		board->uart0->WriteString(board->uart0," mV\n");
-		itoa((5000*val[1])>>11, str, 10);
+		itoa((5000*(res&0xffff))>>13, str, 10);
 		board->uart0->WriteString(board->uart0, "Val ADC(B) = ");
 		board->uart0->WriteString(board->uart0, str);
 		board->uart0->WriteString(board->uart0," mV\n");
@@ -387,7 +343,7 @@ static void AdcInit(board_handle_t * board)
     board->adc2->Start(board->adc2);
     board->adc2->GetResult(board->adc2, &res);
     board->uart0->WriteString(board->uart0,"Val = ");
-    itoa((3300*res)>>10, str, 10);
+    itoa((33000*res)>>10, str, 10);
     board->uart0->WriteString(board->uart0, str);
     board->uart0->WriteString(board->uart0," mV\n");
 

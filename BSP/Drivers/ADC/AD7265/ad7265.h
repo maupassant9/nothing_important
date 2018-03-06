@@ -23,7 +23,7 @@
  *		>> (07/Jan/2018): Creation of the function;
  *
  *============================================================*/
- void DrvAd7253Init(adc_handle_t * handle, void * conf);
+ void DrvAd7265Init(adc_handle_t * handle, void * conf);
 
 
  /*============================================================
@@ -38,7 +38,7 @@
   *		>> (08/Jan/2018): Creation of the function;
   *
   *============================================================*/
- void DrvAd7253Link(adc_handle_t * handle, void * comm);
+ void DrvAd7265Link(adc_handle_t * handle, void * comm);
 
  /*============================================================
   * Function:  DrvMcp3021Start
@@ -54,7 +54,7 @@
   *		>> (07/Jan/2018): Creation of the function;
   *
   *============================================================*/
- void DrvAd7253Start(adc_handle_t * handle);
+ void DrvAd7265Start(adc_handle_t * handle);
 
  /*============================================================
   * Function:  DrvMcp3021Enable
@@ -81,7 +81,9 @@
   *		>> (07/Jan/2018): Creation of the function;
   *
   *============================================================*/
- void DrvAd7253GetResult(adc_handle_t * handle, uint32_t *val);
+ void DrvAd7265GetResult(adc_handle_t * handle, uint32_t *val);
+
+ void DrvAd7265NotSupported(adc_handle_t * handle);
 
 
 
