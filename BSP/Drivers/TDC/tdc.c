@@ -33,8 +33,8 @@
 #include "include/edma.h"
 #include "include/spi.h"
 
-
-#define ONE_READ_LENGTH 100
+//ONE_READ_LENGTH should be a number of factor 4
+#define ONE_READ_LENGTH 400
 /*=========================================
  * Internal Variables
  *=========================================*/
@@ -46,7 +46,7 @@ typedef  struct{
     uint32_t wt_buffer[20];
     uint16_t rd_buffer[21*ONE_READ_LENGTH];
     //commands used to complete DMA transfer
-    uint32_t cmds[13];
+    uint32_t cmds[19];
     uint32_t spi_data1_val;
     //data used for dma wasting time.
     uint16_t waste;
@@ -96,7 +96,7 @@ static void TdcCalc(tdc_handle_t * handle, int index, uint32_t *result);
 static void TdcReadRegSeqDma(tdc_handle_t * handle);
 static void TdcWriteReg(tdc_handle_t * handle, uint16_t addr, uint8_t val);
 static void TdcDmaInit(tdc_handle_t * handle);
-
+static void TdcEnterAutoMode(tdc_handle_t * handle);
 
 
 /*=========================================
@@ -146,6 +146,7 @@ static void TdcHandleInit(tdc_handle_t * handle, tdc_conf_t * ptr_conf)
 {
     tdc_internal_t * ptr_internal;
     void * comm = handle->ptr_internal;
+    EDMA3CCPaRAMEntry * ptr_param_set;
 
     handle->ptr_internal = malloc(sizeof(tdc_internal_t));
     ptr_internal = (tdc_internal_t *)(handle->ptr_internal);
@@ -253,6 +254,28 @@ static void TdcHandleInit(tdc_handle_t * handle, tdc_conf_t * ptr_conf)
     TdcWriteReg(handle, TDC_CFG1, ptr_internal->cfg1);
     TdcWriteReg(handle, TDC_CFG2, ptr_internal->cfg2);
     DrvTdcNextChannel(handle);
+
+    //Here init the DMA for read which will be used a
+    // lot in the future
+    ptr_param_set = &ptr_internal->dma.param_set_rd;
+    ptr_param_set->srcAddr = ptr_internal->spi_handle->base_addr + 0x40; //address of SPIBUF
+    ptr_param_set->destAddr = (uint32_t)&ptr_internal->dma.rd_buffer[0]; //write buffer+1 (16bit)
+    ptr_param_set->bCnt = 20;
+    ptr_param_set->srcBIdx = 0;
+    ptr_param_set->destBIdx = 2;
+    ptr_param_set->srcCIdx = 0;
+    ptr_param_set->destCIdx =  0;
+    ptr_param_set->bCntReload = 20; //no reload needed
+	ptr_param_set->opt = 0x00101100;
+	ptr_param_set->linkAddr = 0xffff;
+	ptr_param_set->aCnt = 2;
+	ptr_param_set->cCnt = 1;
+
+	EDMA3RequestChannel(SOC_EDMA30CC_0_REGS,
+						EDMA3_CHANNEL_TYPE_DMA,
+						CHANNEL_NO_RD,  //channel number
+						1,  //tcc number
+						0); //event queue number
 }
 
 /*============================================================
@@ -309,6 +332,12 @@ static void TdcPscGpioInit(tdc_handle_t * handle)
 			 (TDC2_INT2_PIN_MUX_VAL | save_pin_mux);
 	GPIODirModeSet(SOC_GPIO_0_REGS, TDC2_INT2_PIN, GPIO_DIR_INPUT);
     //Enable GPIO BANK 0 interrupt. TODO:
+	GPIOIntTypeSet(SOC_GPIO_0_REGS, TDC1_INT1_PIN, GPIO_INT_TYPE_RISEDGE);
+	GPIOIntTypeSet(SOC_GPIO_0_REGS, TDC1_INT2_PIN, GPIO_INT_TYPE_RISEDGE);
+	GPIOIntTypeSet(SOC_GPIO_0_REGS, TDC2_INT1_PIN, GPIO_INT_TYPE_RISEDGE);
+	GPIOIntTypeSet(SOC_GPIO_0_REGS, TDC2_INT2_PIN, GPIO_INT_TYPE_RISEDGE);
+
+	GPIOBankIntDisable(SOC_GPIO_0_REGS, 0);
 	DrvTdcEnable(handle);
 }
 
@@ -364,22 +393,48 @@ static uint8_t TdcReadReg(tdc_handle_t * handle, uint16_t addr)
 static void TdcReadRegSeq(tdc_handle_t * handle, uint16_t addr, uint8_t num)
 {
     tdc_internal_t * ptr_internal = (tdc_internal_t *)(handle->ptr_internal);
-    uint32_t cnt = 0;
-    uint16_t * data = &ptr_internal->dma.rd_buffer[0];
+    uint32_t cnt = 0, cmd[4];
+    uint32_t wr_reg_addr = (uint32_t)ptr_internal->spi_handle->base_addr;
+    uint32_t rd_reg_addr = wr_reg_addr;
+
+    wr_reg_addr += 0x38;
+    rd_reg_addr += 0x40;
 
     addr = addr << 8;
-    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, true,
-    		ptr_internal->curr->set_cs_cmd);
-    ptr_internal->spi_handle->Write(ptr_internal->spi_handle, addr|AUTO_INCREMENT);
-    for(cnt = 0;cnt < num-1; cnt++)
-    {
-    	//ptr_internal->spi_handle->Write(ptr_internal->spi_handle, addr);
-    	ptr_internal->spi_handle->Write(ptr_internal->spi_handle, 0);
-    	data[cnt] = ptr_internal->spi_handle->Read(ptr_internal->spi_handle);
-    }
-    data[cnt] = ptr_internal->spi_handle->Read(ptr_internal->spi_handle);
-    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, false,
-    		ptr_internal->curr->set_cs_cmd);
+    cmd[0] = 0x10348000|addr;
+    cmd[1] = 0x10388000|addr;
+    cmd[2] = 0x101c8000|addr;
+    cmd[3] = 0x102c8000|addr;
+
+
+	//Init the para_set for read
+	EDMA3SetPaRAM(SOC_EDMA30CC_0_REGS, CHANNEL_NO_RD, &ptr_internal->dma.param_set_rd);
+	SPIIntEnable(ptr_internal->spi_handle->base_addr, SPI_DMA_REQUEST_ENA_INT);
+	EDMA3EnableDmaEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_RD);
+
+//    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, true,
+//    		ptr_internal->curr->set_cs_cmd);
+//    ptr_internal->spi_handle->Write(ptr_internal->spi_handle, addr|AUTO_INCREMENT);
+//    for(cnt = 0;cnt < num-1; cnt++)
+//    {
+//    	//ptr_internal->spi_handle->Write(ptr_internal->spi_handle, addr);
+//    	ptr_internal->spi_handle->Write(ptr_internal->spi_handle, 0);
+//    	data[cnt] = ptr_internal->spi_handle->Read(ptr_internal->spi_handle);
+//    }
+//    data[cnt] = ptr_internal->spi_handle->Read(ptr_internal->spi_handle);
+//    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, false,
+//    		ptr_internal->curr->set_cs_cmd);
+    //HWREG(wr_reg_addr+4) = cmd[idx2];
+
+    HWREG(wr_reg_addr+4) = cmd[ptr_internal->curr->ch_no];
+    for(cnt = 1;cnt < num; cnt++)
+	{
+    	HWREG(wr_reg_addr) = 0;//cmd[idx2];;
+	}
+    SPIIntDisable(ptr_internal->spi_handle->base_addr, SPI_DMA_REQUEST_ENA_INT);
+    EDMA3DisableDmaEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_RD);
+
+    //HWREG(wr_reg_addr+4) = cmd[idx2]&0x7fffffff;
 }
 
 /*============================================================
@@ -649,7 +704,7 @@ void DrvTdcStart(tdc_handle_t * handle)
 
 
  /*============================================================
-  * Function: TdcDmaInit
+  * Function: TdcEnterAutoMode
   * Description: DMA peripheral initialization for TDC7201.
   * This function is used only inside Tdc driver, should not be
   * called outside the tdc driver scope. The function initialize
@@ -666,7 +721,7 @@ void DrvTdcStart(tdc_handle_t * handle)
   *    >> (26/Jan/2018): Finished.
   *
   *============================================================*/
-  void DrvTdcEnterAutoMode(tdc_handle_t * handle)
+  static void TdcEnterAutoMode(tdc_handle_t * handle)
   {
  	tdc_internal_t * ptr_internal = (tdc_internal_t *)handle->ptr_internal;
  	spi_handle_t * spi_handle = ptr_internal->spi_handle;
@@ -674,12 +729,11 @@ void DrvTdcStart(tdc_handle_t * handle)
  	uint16_t cnt = 0;
 
      //1 - Initiate the write and read buffer for DMA.
-     for(;cnt < 21; cnt++) {
-     	ptr_internal->dma.wt_buffer[cnt] = 0x10000000;
-     	ptr_internal->dma.rd_buffer[cnt] = 0;
-     }
-     ptr_internal->dma.wt_buffer[0] = 0x1000|0x8000;
-     ptr_internal->dma.wt_buffer[19] = 0x0;
+ 	ptr_internal->dma.wt_buffer[0] = 0x1000|0x8000;
+ 	for(cnt = 1;cnt < 19; cnt++) {
+     	ptr_internal->dma.wt_buffer[cnt] = 0x10340000;
+    }
+
      //ptr_internal->dma.wt_buffer[20] = 0x0;
 
  	// 2- Initiate the command buffer for DMA.
@@ -688,14 +742,22 @@ void DrvTdcStart(tdc_handle_t * handle)
  	//spi conf. //No cs_hold + CS_SELECT + Start CMD
  	// * [first 16 bits] - value of spi_data1;
  	// * [second 16 bits] - value of StartCMD
- 	ptr_internal->dma.cmds[1] = ptr_internal->cfg1|0x01|0x4000;
- 	ptr_internal->dma.cmds[2] = ((uint32_t)0x9000); //reserved
+ 	ptr_internal->dma.cmds[1] = ptr_internal->cfg1|0x01|0x4000|0x10380000;
+ 	ptr_internal->dma.cmds[2] = ptr_internal->cfg1|0x01|0x4000|0x101c0000;
+ 	ptr_internal->dma.cmds[3] = ptr_internal->cfg1|0x01|0x4000|0x102c0000;
+ 	ptr_internal->dma.cmds[4] = ptr_internal->cfg1|0x01|0x4000|0x10340000;
+
+
+ 	ptr_internal->dma.cmds[5] = ((uint32_t)0x9000); //reserved
  	//Enable DMA Event CHANNEL_NO_WR&CHANNEL_NO_RD
- 	ptr_internal->dma.cmds[3] = (0x01 << CHANNEL_NO_WR)|(0x01 << CHANNEL_NO_RD);
+ 	ptr_internal->dma.cmds[6] = (0x01 << CHANNEL_NO_WR)|(0x01 << CHANNEL_NO_RD);
  	 //SPI conf: CS hold + CS4 - CH2 + Consequent read command
  	// * [first 16 bits] - value of spi_data1;
  	// * [second 16 bits] - value of READ SEQ CMD. 0x10 is address of result regs TDC
- 	ptr_internal->dma.cmds[4] = 0x10000000|AUTO_INCREMENT|(0x10<<8);
+ 	ptr_internal->dma.cmds[7] = 0x10340000|AUTO_INCREMENT|(0x10<<8);
+ 	ptr_internal->dma.cmds[8] = 0x10380000|AUTO_INCREMENT|(0x10<<8);
+ 	ptr_internal->dma.cmds[9] = 0x101c0000|AUTO_INCREMENT|(0x10<<8);
+ 	ptr_internal->dma.cmds[10] = 0x102c0000|AUTO_INCREMENT|(0x10<<8);
 
  	//3 - Init DMA
  	EDMA3Init(SOC_EDMA30CC_0_REGS, 0);
@@ -760,23 +822,23 @@ void DrvTdcStart(tdc_handle_t * handle)
  	ptr_param_set->destBIdx = 0;
  	ptr_param_set->srcCIdx = 0;
  	ptr_param_set->destCIdx =  0;
- 	ptr_param_set->bCntReload = 0; //no reload needed
+ 	ptr_param_set->bCntReload = 19; //no reload needed
  	ptr_param_set->opt = 0x00400200|(CHANNEL_NO_WRAUX_1<<12);
  	ptr_param_set->linkAddr = 0xffff; //--->PARAM2
- 	ptr_param_set->aCnt = 4; //16 bits
- 	ptr_param_set->cCnt = 1; //ONE_READ_LENGTH
+ 	ptr_param_set->aCnt = 4; //32 bits
+ 	ptr_param_set->cCnt = 1; //ONE_READ_LENGTH // -------changed------ from 1 to 4
  	//Save this param set in cmds for future use
- 	ptr_internal->dma.cmds[5] = ptr_param_set->opt;
-	ptr_internal->dma.cmds[6] = ptr_param_set->srcAddr;
-	ptr_internal->dma.cmds[7] = ptr_param_set->aCnt + (ptr_param_set->bCnt << 16);
-	ptr_internal->dma.cmds[8] =	ptr_param_set->destAddr;
-	ptr_internal->dma.cmds[9] = ptr_param_set->srcBIdx + (ptr_param_set->destBIdx << 16);
-	ptr_internal->dma.cmds[10] = ptr_param_set->linkAddr + (ptr_param_set->bCntReload << 16);
-	ptr_internal->dma.cmds[11] = (ptr_param_set->srcCIdx&0x0000ffff) + (ptr_param_set->destCIdx << 16);
-	ptr_internal->dma.cmds[12] = ptr_param_set->cCnt;
+ 	ptr_internal->dma.cmds[11] = ptr_param_set->opt;
+	ptr_internal->dma.cmds[12] = ptr_param_set->srcAddr;
+	ptr_internal->dma.cmds[13] = ptr_param_set->aCnt + (ptr_param_set->bCnt << 16);
+	ptr_internal->dma.cmds[14] =	ptr_param_set->destAddr;
+	ptr_internal->dma.cmds[15] = ptr_param_set->srcBIdx + (ptr_param_set->destBIdx << 16);
+	ptr_internal->dma.cmds[16] = ptr_param_set->linkAddr + (ptr_param_set->bCntReload << 16);
+	ptr_internal->dma.cmds[17] = (ptr_param_set->srcCIdx&0x0000ffff) + (ptr_param_set->destCIdx << 16);
+	ptr_internal->dma.cmds[18] = ptr_param_set->cCnt;
 
  	//5.2 - WR AUXILIAR 1: just to waste some time....
- 	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[5];
+ 	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[11];
  	ptr_param_set->destAddr = (uint32_t)&ptr_internal->dma.waste;
  	ptr_param_set->bCnt = 50;
  	ptr_param_set->srcBIdx = 0;
@@ -793,16 +855,16 @@ void DrvTdcStart(tdc_handle_t * handle)
  	//5.3 - Init para_set for WR AUXILIAR 2
  	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[1]; //write buffer+1 (16bit)
  	ptr_param_set->destAddr = spi_handle->base_addr + 0x3c; //address of SPI DAT0
- 	ptr_param_set->bCnt = 1;
- 	ptr_param_set->srcBIdx = 0;
+ 	ptr_param_set->bCnt = 4;//------Changed------//from 1 to 4:
+ 	ptr_param_set->srcBIdx = 4;//------Changed------//from 0 to 4:
  	ptr_param_set->destBIdx = 0;
- 	ptr_param_set->srcCIdx = 0;
+ 	ptr_param_set->srcCIdx = -12; //----Changed-----//from 0 to -12
  	ptr_param_set->destCIdx = 0;
- 	ptr_param_set->bCntReload = 1; //no reload needed
+ 	ptr_param_set->bCntReload = 4; //------changed-----//from 1 to 4:
  	ptr_param_set->opt = 0x00c00200|(CHANNEL_NO_WRAUX_3<<12);
  	ptr_param_set->linkAddr = 0xffff;
  	ptr_param_set->aCnt = 4; //32 bits
- 	ptr_param_set->cCnt = ONE_READ_LENGTH;
+ 	ptr_param_set->cCnt = ONE_READ_LENGTH/4; //-------Changed--------//from ONE_READ_LENGTH to ONE_READ_LENGTH/4
  	EDMA3SetPaRAM(SOC_EDMA30CC_0_REGS, CHANNEL_NO_WRAUX_2, ptr_param_set);
 
  	//5.4 - Init the param_set for WR AUXILIAR 3
@@ -836,7 +898,7 @@ void DrvTdcStart(tdc_handle_t * handle)
  	EDMA3SetPaRAM(SOC_EDMA30CC_0_REGS, CHANNEL_NO_RD, ptr_param_set);
 
  	//5.6 - Init the param_set for CHANNEL INIT 0
- 	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[5]; //write buffer+1 (16bit)
+ 	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[11]; //write buffer+1 (16bit)
  	ptr_param_set->destAddr = SOC_EDMA30CC_0_REGS + 0x4000 + CHANNEL_NO_WR*0x20; //address of DMA Param15
  	ptr_param_set->bCnt = 0x10;
  	ptr_param_set->srcBIdx = 2;
@@ -851,7 +913,7 @@ void DrvTdcStart(tdc_handle_t * handle)
  	EDMA3SetPaRAM(SOC_EDMA30CC_0_REGS, CHANNEL_NO_INIT_0, ptr_param_set);
 
  	//5.7 - Init the param_set of CHANNEL INIT 1
-	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[3]; //write buffer+1 (16bit)
+	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[6]; //write buffer+1 (16bit)
 	ptr_param_set->destAddr = SOC_EDMA30CC_0_REGS + 0x1040; //0x308;
 	ptr_param_set->bCnt = 2;
 	ptr_param_set->srcBIdx = 0;
@@ -866,7 +928,7 @@ void DrvTdcStart(tdc_handle_t * handle)
 	EDMA3SetPaRAM(SOC_EDMA30CC_0_REGS, CHANNEL_NO_INIT_1, ptr_param_set);
 
  	//5.8 - Init the param_set of CHANNEL INIT 2
- 	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[3]; //write buffer+1 (16bit)
+ 	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[6]; //write buffer+1 (16bit)
  	ptr_param_set->destAddr = SOC_EDMA30CC_0_REGS+0x1030; //address of DMA EECR
  	ptr_param_set->bCnt = 1;
  	ptr_param_set->srcBIdx = 0;
@@ -881,18 +943,18 @@ void DrvTdcStart(tdc_handle_t * handle)
  	EDMA3SetPaRAM(SOC_EDMA30CC_0_REGS, CHANNEL_NO_INIT_2, ptr_param_set);
 
  	//5.9 - Init the param_set of CHANNEL INIT 3
- 	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[4]; //write buffer+1 (16bit)
+ 	ptr_param_set->srcAddr = (uint32_t)&ptr_internal->dma.cmds[7]; //write buffer+1 (16bit)
  	ptr_param_set->destAddr = spi_handle->base_addr + 0x3c; //address of DMA EECR
- 	ptr_param_set->bCnt = 1;
- 	ptr_param_set->srcBIdx = 0;
+ 	ptr_param_set->bCnt = 4; //-------Changed--------: from 1 to 4
+ 	ptr_param_set->srcBIdx = 4; //-------Changed--------: from 0 to 4
  	ptr_param_set->destBIdx = 0;
- 	ptr_param_set->srcCIdx = 0;
+ 	ptr_param_set->srcCIdx = -12; //-------changed------: from 0 to -12
  	ptr_param_set->destCIdx =  0;
- 	ptr_param_set->bCntReload = 1; //no reload needed
+ 	ptr_param_set->bCntReload = 4; //-------Changed--------: from 1 to 4
  	ptr_param_set->opt = 0x00c00200|(CHANNEL_NO_INIT_1<<12); //32bits
  	ptr_param_set->linkAddr = 0xffff;
  	ptr_param_set->aCnt = 4; //32 bits
- 	ptr_param_set->cCnt = ONE_READ_LENGTH;
+ 	ptr_param_set->cCnt = ONE_READ_LENGTH/4;//-------Changed--------: from ONE_READ_LENGTH to ONE_READ_LENGTH/4
  	EDMA3SetPaRAM(SOC_EDMA30CC_0_REGS, CHANNEL_NO_INIT_3, ptr_param_set);
 
  	//6 - Clear some flags: not necessary
@@ -924,10 +986,16 @@ void DrvTdcStart(tdc_handle_t * handle)
   {
 	 tdc_internal_t * ptr_internal = (tdc_internal_t *)handle->ptr_internal;
 
-	 DrvTdcEnterAutoMode(handle);
+	 //set current channel to channel 0
+	 ptr_internal->curr = ptr_internal->ch0;
+
+	 TdcEnterAutoMode(handle);
+	 DrvTdcStart(handle);
 	 ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle,true,
 			 ptr_internal->curr->set_cs_cmd);
+	 GPIOBankIntEnable(SOC_GPIO_0_REGS, 0);
 	 SPIIntEnable(ptr_internal->spi_handle->base_addr, SPI_DMA_REQUEST_ENA_INT);
+
   }
 
  /*============================================================

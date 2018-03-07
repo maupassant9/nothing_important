@@ -265,7 +265,7 @@ static void ConnectTdc(tdc_handle_t * tdc){
 	tdc->GetResult = DrvTdcGetResult;
 	tdc->Enable = DrvTdcEnable;
 	tdc->Disable = DrvTdcDisable;
-	tdc->EnterAutoMode = DrvTdcEnterAutoMode;
+	tdc->EnterAutoMode = DrvTdcDmaAutoStart;
     tdc->Link = DrvTdcSetComm;
     tdc->Next = DrvTdcNextChannel;
 }

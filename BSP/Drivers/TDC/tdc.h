@@ -118,16 +118,21 @@ void DrvTdcInit(tdc_handle_t * handle, void * ptr_conf);
 void DrvTdcGetResult(tdc_handle_t * handle, uint32_t *result);
 
 /*============================================================
- * Function: DrvTdcEnterAutoMode
- * Usage: Enter DMA Auto Mode. After calling this function, the
+ * Function: TdcDmaAutoStart
+ * Description: This function:
+ * (1) Clear the event flag and miss event flag
+ * (2) Enable the SPI DMA event, which will starts the dma transfer.
  *
  * Para:
- *    >> tdc_handle_t: tdc handle.
+ *    >> tdc_handle_t : a tdc7201 handle
  * Return:
- *    >>
+ *     >>
+ * Change Record:
+ *		>> (12/Jan/2018): Creation of the function;
+ *		>> (26/Jan/2018): finished.
  *
  *============================================================*/
-void DrvTdcEnterAutoMode(tdc_handle_t * handle);
+void DrvTdcDmaAutoStart(tdc_handle_t * handle);
 
  /*============================================================
   * Function: DrvTdcStart()
@@ -196,5 +201,7 @@ void DrvTdcSetComm(tdc_handle_t * handle, void * comm);
   *============================================================*/
  void DrvTdcNextChannel(tdc_handle_t * handle);
 
+
+ void TdcInt(tdc_handle_t *handle);
 
 #endif /* BSP_DRIVERS_TDC_TDC_H_ */

@@ -63,6 +63,7 @@ void IsrAdc()
 //		cnt2 = 0;
 //	}
 
+
 	board->tdc->Start(board->tdc);
 	//chk tdc int here
 
@@ -73,7 +74,11 @@ void IsrAdc()
 
 }
 
-
+void TaskFunc()
+{
+	//board->tdc->EnterAutoMode(board->tdc);
+	//while(1);
+}
 /*
  *  ======== main ========
  */
@@ -87,6 +92,7 @@ Int main()
      */
     board = BoardInit();
 	//board->lacos->Start(board->lacos);
+
 
     BIOS_start();    /* does not return */
     return(0);
