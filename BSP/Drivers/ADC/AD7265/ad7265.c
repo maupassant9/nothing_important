@@ -142,6 +142,7 @@ typedef struct {
  *     >>
  * Change Record:
  *		>> (07/Jan/2018): Creation of the function;
+ *		>> (08/Mar/2018): accelerate the read speed.
  *
  *============================================================*/
 void DrvAd7265Start(adc_handle_t * handle)
@@ -150,17 +151,29 @@ void DrvAd7265Start(adc_handle_t * handle)
 
 	adc_internal_t * ptr_internal =
 			(adc_internal_t *)(handle->ptr_internal);
-
 	spi_handle_t *spi_handle = ptr_internal->spi_handle;
+    uint32_t wr_reg_addr = (uint32_t)spi_handle->base_addr;
+    uint32_t rd_reg_addr = wr_reg_addr;
 
-	res[0] = 0; res[1] = 0;
+    wr_reg_addr += 0x38;
+    rd_reg_addr += 0x40;
+
 	//spi_handle->SetCs(spi_handle,0x01);
-	spi_handle->CsHold(spi_handle,1, 0x01); //TODO:
-	spi_handle->Write(spi_handle,0x00);
-	res[0] = spi_handle->Read(spi_handle);
-	spi_handle->Write(spi_handle,0x00);
-	res[1] = spi_handle->Read(spi_handle);
-	spi_handle->CsHold(spi_handle,0,0x01); //TODO: changed here. CsHold function more params
+//	spi_handle->CsHold(spi_handle,1, 0x01); //TODO:
+//	spi_handle->Write(spi_handle,0x00);
+//	res[0] = spi_handle->Read(spi_handle);
+//	spi_handle->Write(spi_handle,0x00);
+//	res[1] = spi_handle->Read(spi_handle);
+//	spi_handle->CsHold(spi_handle,0,0x01);
+
+	HWREG(wr_reg_addr+4) = 0x10000000;
+	while(!(HWREG(spi_handle->base_addr+0x10) & 0x0100));
+	res[0] = HWREG(rd_reg_addr);
+	HWREG(wr_reg_addr) = 0;
+	while(!(HWREG(spi_handle->base_addr+0x10) & 0x0100));
+	res[1] = HWREG(rd_reg_addr);
+	*(volatile uint16_t *)(wr_reg_addr+6) = 0x0;
+
 
 	//TODO: need to check the value;
 	ptr_internal->data[0] = res[0]>>2;

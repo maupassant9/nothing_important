@@ -395,11 +395,8 @@ static void TdcReadRegSeq(tdc_handle_t * handle, uint16_t addr, uint8_t num)
     tdc_internal_t * ptr_internal = (tdc_internal_t *)(handle->ptr_internal);
     uint32_t cnt = 0, cmd[4];
     uint32_t wr_reg_addr = (uint32_t)ptr_internal->spi_handle->base_addr;
-    uint32_t rd_reg_addr = wr_reg_addr;
 
     wr_reg_addr += 0x38;
-    rd_reg_addr += 0x40;
-
     addr = addr << 8;
     cmd[0] = 0x10348000|addr;
     cmd[1] = 0x10388000|addr;
@@ -412,29 +409,14 @@ static void TdcReadRegSeq(tdc_handle_t * handle, uint16_t addr, uint8_t num)
 	SPIIntEnable(ptr_internal->spi_handle->base_addr, SPI_DMA_REQUEST_ENA_INT);
 	EDMA3EnableDmaEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_RD);
 
-//    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, true,
-//    		ptr_internal->curr->set_cs_cmd);
-//    ptr_internal->spi_handle->Write(ptr_internal->spi_handle, addr|AUTO_INCREMENT);
-//    for(cnt = 0;cnt < num-1; cnt++)
-//    {
-//    	//ptr_internal->spi_handle->Write(ptr_internal->spi_handle, addr);
-//    	ptr_internal->spi_handle->Write(ptr_internal->spi_handle, 0);
-//    	data[cnt] = ptr_internal->spi_handle->Read(ptr_internal->spi_handle);
-//    }
-//    data[cnt] = ptr_internal->spi_handle->Read(ptr_internal->spi_handle);
-//    ptr_internal->spi_handle->CsHold(ptr_internal->spi_handle, false,
-//    		ptr_internal->curr->set_cs_cmd);
-    //HWREG(wr_reg_addr+4) = cmd[idx2];
-
     HWREG(wr_reg_addr+4) = cmd[ptr_internal->curr->ch_no];
     for(cnt = 1;cnt < num; cnt++)
 	{
-    	HWREG(wr_reg_addr) = 0;//cmd[idx2];;
+    	HWREG(wr_reg_addr) = 0;
 	}
     SPIIntDisable(ptr_internal->spi_handle->base_addr, SPI_DMA_REQUEST_ENA_INT);
     EDMA3DisableDmaEvt(SOC_EDMA30CC_0_REGS,CHANNEL_NO_RD);
 
-    //HWREG(wr_reg_addr+4) = cmd[idx2]&0x7fffffff;
 }
 
 /*============================================================

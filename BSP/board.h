@@ -284,7 +284,7 @@
 
 #define SPI0_FREQ 20000000
 #define SPI0_CS_PINS 0x3c
-#define SPI1_FREQ 2000000
+#define SPI1_FREQ 20000000
 #define SPI1_CS_PINS 0x2
 
 #define I2C_SPEED 400000
